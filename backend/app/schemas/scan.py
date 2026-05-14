@@ -3,18 +3,18 @@ from ..models.body_scan import Gender, ClothingType, InputMethod, ScanStatus
 
 
 class MeasurementsBase(BaseModel):
-    height:        float | None = Field(None, description="Height in cm")
-    weight:        float | None = Field(None, description="Weight in kg")
-    chest:         float | None = None
-    waist:         float | None = None
-    hips:          float | None = None
-    shoulder_width:float | None = None
-    neck:          float | None = None
-    sleeve_length: float | None = None
-    inseam:        float | None = None
-    thigh:         float | None = None
-    arm_length:    float | None = None
-    torso_length:  float | None = None
+    height_cm:        float | None = Field(None, description="Height in cm")
+    weight_kg:        float | None = Field(None, description="Weight in kg")
+    chest_cm:         float | None = None
+    waist_cm:         float | None = None
+    hips_cm:          float | None = None
+    shoulder_width_cm:float | None = None
+    neck_cm:          float | None = None
+    sleeve_length_cm: float | None = None
+    inseam_cm:        float | None = None
+    thigh_cm:         float | None = None
+    arm_length_cm:    float | None = None
+    torso_length_cm:  float | None = None
 
 
 class MeasurementsCreate(MeasurementsBase):

@@ -1,17 +1,41 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
+from sqlalchemy import select
 
 from .core.config import settings
-from .core.database import init_db
+from .core.database import init_db, AsyncSessionLocal
+from .core.security import generate_login_token
 from .api.routes import auth, scan
+
+logger = logging.getLogger("naatai")
+
+
+async def _seed_first_user():
+    from .models.user import User
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).limit(1))
+        if result.scalar_one_or_none():
+            return
+        admin_token   = generate_login_token()
+        customer_token = generate_login_token()
+        db.add(User(login_token=admin_token,    name="Admin",    is_admin=True))
+        db.add(User(login_token=customer_token, name="Customer", is_admin=False))
+        await db.commit()
+        logger.warning("=" * 60)
+        logger.warning("FIRST-RUN SETUP — save these tokens!")
+        logger.warning(f"  Admin token:    {admin_token}")
+        logger.warning(f"  Customer token: {customer_token}")
+        logger.warning("=" * 60)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await _seed_first_user()
     Path(settings.STORAGE_PATH).mkdir(parents=True, exist_ok=True)
     yield
 
