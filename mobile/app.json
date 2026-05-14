@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Naatai Fit",
+    "slug": "naatai-fit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "de.naatai.fit",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is required for 3D body scanning",
+        "NSPhotoLibraryUsageDescription": "Photo access required to upload body photos",
+        "NSMicrophoneUsageDescription": "Microphone access required for video scanning"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "de.naatai.fit",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "RECORD_AUDIO"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      ["expo-image-picker", { "photosPermission": "Allow Naatai Fit to access your photos for body scanning." }]
+    ],
+    "scheme": "naataifit"
+  }
+}
