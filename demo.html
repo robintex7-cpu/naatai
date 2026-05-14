@@ -1,1 +1,50 @@
-SEE_INLINE
+<!DOCTYPE html>
+<html lang="en" id="htmlroot">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>NaatAI — Body Measurement</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0f1a;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:hidden}
+.page{display:none;width:100vw;min-height:100vh;overflow-y:auto;flex-direction:column}
+.page.active{display:flex;animation:fadeIn .25s ease}
+.vc{align-items:center;justify-content:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scanline{0%{top:0%}50%{top:90%}100%{top:0%}}
+.spinner{width:44px;height:44px;border:3px solid #1e3a5f;border-top:3px solid #38bdf8;border-radius:50%;animation:spin .8s linear infinite}
+.recdot{width:10px;height:10px;background:#ef4444;border-radius:50%;display:inline-block;animation:blink 1s infinite}
+.btn-p{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:13px 28px;background:#0ea5e9;border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:.18s;width:100%}
+.btn-p:hover{background:#38bdf8;transform:translateY(-1px)}
+.btn-p:disabled{background:#1a2d3d;color:#2d4a5e;cursor:not-allowed;transform:none}
+.btn-g{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 22px;background:none;border:1.5px solid #2d3748;border-radius:11px;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;transition:.18s}
+.btn-g:hover{border-color:#64748b;color:#e2e8f0}
+.card{background:#0f172a;border:1.5px solid #1a2540;border-radius:18px;padding:20px}
+.inp{width:100%;padding:13px 16px;background:#0f172a;border:1.5px solid #2d3748;border-radius:11px;color:#f1f5f9;font-size:15px;outline:none;transition:.2s;font-family:inherit}
+.inp:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.1)}
+.inp::placeholder{color:#3d4f6a}
+badge-cls,.badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:.05em}
+.sel{border-radius:14px;padding:15px;cursor:pointer;border:2px solid #1a2540;background:#0f172a;transition:all .2s;text-align:center}
+.sel:hover{border-color:#2d3f5e;transform:translateY(-2px)}
+.sel.on{border-color:#38bdf8!important;background:rgba(56,189,248,.07)!important}
+.tbar{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1.5px solid #1a2540;background:#0a0f1a;flex-shrink:0}
+.logo{font-size:17px;font-weight:900;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.mr{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1a2540}
+.mr:last-child{border:none}
+.ml{font-size:12px;color:#64748b;font-weight:500}
+.mv{font-size:14px;font-weight:700;color:#f1f5f9}
+.photobox{border:2px dashed #2d3748;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.2s;min-height:170px;padding:20px;text-align:center;overflow:hidden;position:relative}
+.photobox:hover{border-color:#38bdf8;background:rgba(56,189,248,.03)}
+.photobox.done{border-style:solid;border-color:#22c55e}
+.lang-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.lang-b{padding:13px 8px;border:1.5px solid #1a2540;border-radius:12px;background:#0f172a;color:#e2e8f0;cursor:pointer;transition:.2s;text-align:center;font-size:13px;font-weight:600}
+.lang-b:hover,.lang-b.on{border-color:#38bdf8;background:rgba(56,189,248,.08)}
+.adm-r{display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #1a2540;transition:.15s;cursor:pointer;gap:12px}
+.adm-r:hover{background:#0f172a}
+.stat-c{background:#0f172a;border:1.5px solid #1a2540;border-radius:14px;padding:16px;text-align:center}
+.method-card{border-radius:18px;padding:18px;cursor:pointer;border:2px solid #1a2540;background:#0f172a;transition:all .2s;display:flex;align-items:flex-start;gap:14px;margin-bottom:12px}
+.method-card:hover{border-color:#2d3f5e;transform:translateY(-1px)}
+.method-card.on{border-color:#38bdf8;background:rgba(56,189,248,.06)}
+.pl-card{border-radius:16px;padding:16px;cursor:pointer;border:2px solid #1a2540;background:#0f172a;transition:.18s;display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
