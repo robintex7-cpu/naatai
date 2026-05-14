@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: naatai-db
+    environment:
+      POSTGRES_DB:       naatai_fit
+      POSTGRES_USER:     naatai
+      POSTGRES_PASSWORD: naatai2025
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U naatai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (task queue / caching) ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: naatai-redis
+    ports:
+      - "6379:6379"
+
+  # ── Main API  (port 8000) ─────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: naatai-api
+    environment:
+      DATABASE_URL:    postgresql+asyncpg://naatai:naatai2025@postgres:5432/naatai_fit
+      SECRET_KEY:      change-this-in-production-very-long-random-string
+      DEBUG:           "false"
+      STORAGE_PATH:    /app/storage
+      ALLOWED_ORIGINS: '["*"]'
+      AI_SERVICE_URL:  http://ai_service:8001
+    volumes:
+      - ./backend:/app
+      - storage_data:/app/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai_service:
+        condition: service_started
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  # ── AI / ML Service  (port 8001) ──────────────────────────────────
+  # Build from the naatai-ai repo (clone it alongside this repo):
+  #   git clone https://github.com/robintex7-cpu/naatai-ai ../naatai-ai
+  ai_service:
+    build:
+      context: ../naatai-ai
+      dockerfile: Dockerfile
+    container_name: naatai-ai-service
+    environment:
+      STORAGE_PATH: /app/storage
+      MODEL_ROOT:   /app
+    volumes:
+      - storage_data:/app/storage
+      - ./models:/app/models:ro
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  storage_data:
