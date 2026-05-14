@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NaatAI — 3D Body Scanner</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  body { background: #030712; color: white; font-family: 'Inter', sans-serif; margin: 0; }
+  .gradient-text { background: linear-gradient(90deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page { display: none; min-height: 100vh; }
+  .page.active { display: flex; flex-direction: column; }
+  .spinner { border: 4px solid #1e3a5f; border-top: 4px solid #0ea5e9; border-radius: 50%; width: 48px; height: 48px; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .pulse { animation: pulse 1.5s ease-in-out infinite; }
+  .rec-dot { width:12px;height:12px;background:#ef4444;border-radius:50%; animation: pulse 1s infinite; display:inline-block; }
+  #capture-video { position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.45; }
+  .step-bar { height:8px;border-radius:9999px;transition:width 0.1s linear; }
+  #three-canvas { width:100%;height:100%; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ PAGE: LANDING ═══════════════════════════════ -->
+<div id="page-home" class="page active items-center justify-center px-4">
+  <div class="text-center max-w-2xl">
+    <h1 class="text-5xl font-bold mb-3 gradient-text">NaatAI</h1>
+    <p class="text-xl text-gray-400 mb-2">360° Body Scanner</p>
+    <p class="text-gray-500 mb-12">10 seconds of video → textured 3D mesh</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-14">
+      <button onclick="showPage('page-capture-intro')"
+        class="flex flex-col items-center gap-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-8 hover:bg-sky-500/20 transition-all cursor-pointer">
+        <div class="w-16 h-16 rounded-full bg-sky-500/20 flex items-center justify-center text-3xl">📷</div>
+        <div>
+          <p class="font-semibold text-lg text-sky-400">Capture Now</p>
+          <p class="text-sm text-gray-400 mt-1">Follow on-screen guides to record your body scan</p>
+        </div>
+      </button>
+
+      <button onclick="showPage('page-upload')"
+        class="flex flex-col items-center gap-4 rounded-2xl border border-gray-700 bg-gray-800/40 p-8 hover:bg-gray-800/70 transition-all cursor-pointer">
+        <div class="w-16 h-16 rounded-full bg-gray-700/50 flex items-center justify-center text-3xl">📁</div>
+        <div>
+          <p class="font-semibold text-lg text-gray-200">Upload Video</p>
+          <p class="text-sm text-gray-400 mt-1">Upload an existing 360° or standard video</p>
+        </div>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 text-center text-sm text-gray-500">
+      <div><p class="text-2xl font-bold text-gray-300">10s</p><p>video needed</p></div>
+      <div><p class="text-2xl font-bold text-gray-300">~5 min</p><p>processing time</p></div>
+      <div><p class="text-2xl font-bold text-gray-300">OBJ</p><p>output format</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PAGE: CAPTURE INTRO ═══════════════════════════════ -->
+<div id="page-capture-intro" class="page items-center justify-center px-4 text-center">
+  <h2 class="text-3xl font-bold mb-6">Prepare Your Scan</h2>
+  <div class="max-w-md bg-gray-800/80 rounded-2xl p-6 text-left space-y-2 mb-10">
+    <p class="font-semibold text-white mb-3">Before you start:</p>
+    <ul class="space-y-2 text-sm text-gray-300">
+      <li>✅ Place phone on a tripod or have someone hold it steady</li>
+      <li>✅ Stand 2–3 metres away — full body visible, head to feet</li>
+      <li>✅ Good lighting — no harsh backlight behind you</li>
+      <li>✅ Wear fitted or minimal clothing for better mesh detail</li>
+      <li>✅ You will slowly rotate 360° during the 15-second recording</li>
+      <li>✅ Keep arms slightly out from your sides throughout</li>
+    </ul>
+  </div>
+  <div class="flex gap-4">
+    <button onclick="showPage('page-home')" class="py-3 px-6 rounded-xl border border-gray-600 text-gray-400 hover:text-white transition-all">← Back</button>
+    <button onclick="startCapture()" class="bg-sky-500 hover:bg-sky-400 text-white font-bold py-4 px-10 rounded-2xl text-lg transition-all">Start Guided Capture</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PAGE: CAPTURE RECORDING ═══════════════════════════════ -->
+<div id="page-capture-rec" class="page relative" style="min-height:100vh;">
+  <video id="capture-video" autoplay muted playsinline></video>
+
+  <!-- Body silhouette -->
+  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <svg viewBox="0 0 200 500" style="height:65vh;opacity:0.22" fill="none" stroke="white" stroke-width="3">
+      <ellipse cx="100" cy="50" rx="35" ry="40"/>
+      <line x1="100" y1="90" x2="100" y2="280"/>
+      <line x1="100" y1="130" x2="40" y2="220"/>
+      <line x1="100" y1="130" x2="160" y2="220"/>
+      <line x1="100" y1="280" x2="65" y2="460"/>
+      <line x1="100" y1="280" x2="135" y2="460"/>
+    </svg>
+  </div>
+
+  <!-- REC indicator -->
+  <div class="absolute top-4 left-4 flex items-center gap-2 z-10">
+    <span class="rec-dot"></span>
+    <span class="text-xs text-red-400 font-mono">REC</span>
+  </div>
+
+  <!-- Instruction + progress -->
+  <div class="absolute inset-x-0 bottom-0 z-10 p-6" style="background:linear-gradient(to top,rgba(0,0,0,0.85),transparent)">
+    <p id="rec-instruction" class="text-2xl font-bold text-white text-center drop-shadow-lg mb-1">Get Ready</p>
+    <p id="rec-detail" class="text-gray-300 text-center mb-5">Stand 2–3 metres away. Arms slightly out.</p>
+
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-xs text-gray-400 w-20">This step</span>
+      <div class="flex-1 bg-gray-700/60 rounded-full" style="height:8px">
+        <div id="bar-step" class="step-bar bg-sky-400" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-400 w-20">Overall</span>
+      <div class="flex-1 bg-gray-700/60 rounded-full" style="height:8px">
+        <div id="bar-total" class="step-bar bg-green-400" style="width:0%"></div>
+      </div>
+      <span id="bar-pct" class="text-xs text-gray-300 w-8">0%</span>
+    </div>
+    <div id="step-dots" class="flex justify-center gap-2 mt-3"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PAGE: UPLOAD ═══════════════════════════════ -->
+<div id="page-upload" class="page items-center justify-center px-4 flex-col">
+  <h2 class="text-3xl font-bold mb-8">Upload Video</h2>
+
+  <div id="drop-zone"
+    onclick="document.getElementById('file-input').click()"
+    ondragover="event.preventDefault();this.classList.add('border-sky-400','bg-sky-500/10')"
+    ondragleave="this.classList.remove('border-sky-400','bg-sky-500/10')"
+    ondrop="handleDrop(event)"
+    class="cursor-pointer border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-2xl p-16 text-center transition-all max-w-md w-full">
+    <p class="text-5xl mb-4">🎥</p>
+    <p class="text-lg font-semibold text-gray-200">Drop your video here</p>
+    <p class="text-sm text-gray-500 mt-2">or click to browse</p>
+    <p class="text-xs text-gray-600 mt-4">MP4, MOV, AVI, MKV — 10 to 60 seconds</p>
+    <input id="file-input" type="file" accept="video/*" class="hidden" onchange="handleFileSelect(event)" />
+  </div>
+
+  <p id="upload-error" class="text-red-400 mt-4 text-sm hidden"></p>
+
+  <div class="mt-8 max-w-md w-full bg-gray-800/50 rounded-xl p-5 text-sm text-gray-400 space-y-1">
+    <p class="font-semibold text-gray-300 mb-2">Tips for best results:</p>
+    <p>• Person rotates slowly and fully (360°)</p>
+    <p>• Good lighting, no harsh backlight</p>
+    <p>• Full body visible head to feet</p>
+    <p>• Minimal / fitted clothing = more detail</p>
+    <p>• 10–15 second clip is ideal</p>
+  </div>
+
+  <button onclick="showPage('page-home')" class="mt-6 text-gray-500 hover:text-gray-300 text-sm transition-all">← Back</button>
+</div>
+
+<!-- ═══════════════════════════════ PAGE: PROCESSING ═══════════════════════════════ -->
+<div id="page-processing" class="page items-center justify-center px-4 flex-col">
+  <div class="max-w-md w-full text-center">
+    <div class="spinner mx-auto mb-8"></div>
+    <h2 class="text-2xl font-bold mb-2">Building your 3D mesh</h2>
+    <p id="proc-step" class="text-gray-400 mb-8">Extracting frames from video...</p>
+
+    <div class="w-full bg-gray-800 rounded-full mb-10" style="height:12px">
+      <div id="proc-bar" class="bg-sky-500 rounded-full transition-all duration-500" style="width:0%;height:12px"></div>
+    </div>
+
+    <div id="proc-steps" class="text-left space-y-3"></div>
+    <p class="text-xs text-gray-600 mt-10">Processing takes 5–20 minutes on CPU. Do not close this tab.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PAGE: RESULT ═══════════════════════════════ -->
+<div id="page-result" class="page flex-col" style="min-height:100vh">
+  <header class="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+    <h1 class="text-lg font-bold text-sky-400">NaatAI — Scan Result</h1>
+    <div class="flex gap-3">
+      <button onclick="showPage('page-home')" class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all">New Scan</button>
+      <button onclick="alert('In the full app this downloads your mesh.obj file.')" class="bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all">Download OBJ</button>
+    </div>
+  </header>
+  <div id="three-mount" class="flex-1 relative" style="min-height:70vh"></div>
+  <footer class="px-6 py-3 text-center text-xs text-gray-600 border-t border-gray-800 flex-shrink-0">
+    Drag to rotate · Scroll to zoom · Right-click drag to pan
+  </footer>
+</div>
+
+<script>
+// ─── Router ───────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─── Capture flow ─────────────────────────────────────────
+const STEPS = [
+  { instruction: 'Get Ready',          duration: 3, detail: 'Stand 2–3 metres away. Arms slightly out from your sides.' },
+  { instruction: 'Face Forward',       duration: 3, detail: 'Look straight at the camera. Stay still.' },
+  { instruction: 'Slowly Turn Right',  duration: 4, detail: 'Rotate slowly to your right. Keep your arms out.' },
+  { instruction: 'Keep Turning',       duration: 3, detail: 'Almost there — continue rotating...' },
+  { instruction: 'Face Forward Again', duration: 2, detail: 'Complete the full rotation. Done!' },
+];
+const TOTAL_DUR = STEPS.reduce((a, s) => a + s.duration, 0);
+
+let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+
+async function startCapture() {
+  showPage('page-capture-rec');
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+  } catch {
+    // Demo fallback — no camera access (e.g., file:// protocol)
+    mediaStream = null;
+  }
+
+  const video = document.getElementById('capture-video');
+  if (mediaStream && video) {
+    video.srcObject = mediaStream;
+    video.play();
+  }
+
+  // Build step dots
+  const dots = document.getElementById('step-dots');
+  dots.innerHTML = STEPS.map((_, i) =>
+    `<div id="dot-${i}" style="width:8px;height:8px;border-radius:50%;background:#4b5563;transition:all 0.3s"></div>`
+  ).join('');
+
+  recordedChunks = [];
+  if (mediaStream) {
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+    mediaRecorder.onstop = finishCapture;
+    mediaRecorder.start(100);
+  }
+
+  let elapsed = 0;
+  for (let i = 0; i < STEPS.length; i++) {
+    const step = STEPS[i];
+    const stepStart = elapsed;
+    document.getElementById('rec-instruction').textContent = step.instruction;
+    document.getElementById('rec-detail').textContent = step.detail;
+    STEPS.forEach((_, j) => {
+      const dot = document.getElementById(`dot-${j}`);
+      dot.style.background = j < i ? '#4ade80' : j === i ? '#38bdf8' : '#4b5563';
+      dot.style.transform = j === i ? 'scale(1.4)' : 'scale(1)';
+    });
+
+    await new Promise(resolve => {
+      const iv = setInterval(() => {
+        elapsed += 0.1;
+        const se = elapsed - stepStart;
+        document.getElementById('bar-step').style.width = Math.min(se / step.duration * 100, 100) + '%';
+        document.getElementById('bar-total').style.width = Math.min(elapsed / TOTAL_DUR * 100, 100) + '%';
+        document.getElementById('bar-pct').textContent = Math.round(elapsed / TOTAL_DUR * 100) + '%';
+        if (se >= step.duration) { clearInterval(iv); resolve(); }
+      }, 100);
+    });
+  }
+
+  if (mediaRecorder) mediaRecorder.stop();
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  if (!mediaStream) finishCapture(); // demo mode
+}
+
+function finishCapture() {
+  startProcessing();
+}
+
+// ─── Upload ────────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('border-sky-400', 'bg-sky-500/10');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+function processFile(file) {
+  if (!file.type.startsWith('video/')) {
+    const err = document.getElementById('upload-error');
+    err.textContent = 'Please select a video file.';
+    err.classList.remove('hidden');
+    return;
+  }
+  startProcessing();
+}
+
+// ─── Processing simulation ────────────────────────────────
+const PROC_STEPS = [
+  'Extracting frames from video...',
+  'Removing background per frame...',
+  'Splitting 360° equirectangular views...',
+  'Estimating camera positions (COLMAP)...',
+  'Building dense point cloud...',
+  'Generating textured mesh...',
+];
+
+function startProcessing() {
+  showPage('page-processing');
+  const stepsEl = document.getElementById('proc-steps');
+  stepsEl.innerHTML = PROC_STEPS.map((label, i) =>
+    `<div class="flex items-center gap-3">
+      <div id="pstep-${i}" style="width:24px;height:24px;border-radius:50%;background:#374151;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;flex-shrink:0;color:#9ca3af">${i+1}</div>
+      <span id="plabel-${i}" style="font-size:14px;color:#4b5563">${label}</span>
+    </div>`
+  ).join('');
+
+  let step = 0;
+  const totalSteps = PROC_STEPS.length;
+
+  function advanceStep() {
+    if (step >= totalSteps) {
+      showResult();
+      return;
+    }
+    // Mark previous done
+    if (step > 0) {
+      document.getElementById(`pstep-${step-1}`).style.background = '#22c55e';
+      document.getElementById(`pstep-${step-1}`).textContent = '✓';
+      document.getElementById(`plabel-${step-1}`).style.color = '#6b7280';
+      document.getElementById(`plabel-${step-1}`).style.textDecoration = 'line-through';
+    }
+    // Mark current active
+    const el = document.getElementById(`pstep-${step}`);
+    el.style.background = '#0ea5e9';
+    el.style.color = 'white';
+    el.classList.add('pulse');
+    document.getElementById(`plabel-${step}`).style.color = 'white';
+    document.getElementById(`plabel-${step}`).style.fontWeight = '500';
+    document.getElementById('proc-step').textContent = PROC_STEPS[step];
+
+    const pct = Math.round((step / totalSteps) * 100);
+    document.getElementById('proc-bar').style.width = pct + '%';
+
+    step++;
+    // Vary timing to feel realistic
+    const delays = [800, 1200, 1000, 1500, 2000, 1200];
+    setTimeout(advanceStep, delays[step - 1] || 1000);
+  }
+
+  advanceStep();
+}
+
+// ─── Result + Three.js 3D viewer ─────────────────────────
+function showResult() {
+  // Mark last step done
+  const last = PROC_STEPS.length - 1;
+  document.getElementById(`pstep-${last}`).style.background = '#22c55e';
+  document.getElementById(`pstep-${last}`).textContent = '✓';
+  document.getElementById('proc-bar').style.width = '100%';
+
+  setTimeout(() => {
+    showPage('page-result');
+    initThreeViewer();
+  }, 600);
+}
+
+function initThreeViewer() {
+  const mount = document.getElementById('three-mount');
+  mount.innerHTML = '';
+
+  const w = mount.clientWidth || window.innerWidth;
+  const h = mount.clientHeight || window.innerHeight * 0.7;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  mount.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111827);
+  scene.fog = new THREE.FogExp2(0x111827, 0.04);
+
+  const camera = new THREE.PerspectiveCamera(55, w / h, 0.01, 200);
+  camera.position.set(0, 1.6, 3.5);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(4, 8, 4);
+  dir.castShadow = true;
+  scene.add(dir);
+  const fill = new THREE.DirectionalLight(0x8ecae6, 0.4);
+  fill.position.set(-4, 2, -4);
+  scene.add(fill);
+  const rim = new THREE.PointLight(0x38bdf8, 0.6, 20);
+  rim.position.set(2, 3, -2);
+  scene.add(rim);
+
+  // Floor grid
+  const grid = new THREE.GridHelper(10, 20, 0x1e3a5f, 0x1e3a5f);
+  grid.position.y = -0.01;
+  scene.add(grid);
+
+  // ── Demo human figure (stylised placeholder) ──
+  const mat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6, metalness: 0.1 });
+  const wireMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.4, metalness: 0.2, wireframe: false });
+
+  function box(w, h, d, x, y, z, m) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m || mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+  function sphere(r, x, y, z, m) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), m || mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+  function cyl(rt, rb, h, x, y, z, m) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), m || mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Body parts (Y=0 at feet)
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xfbbf7a, roughness: 0.5 });
+  sphere(0.22, 0, 1.72, 0, headMat);          // head
+  box(0.52, 0.6, 0.28, 0, 1.25, 0);           // torso upper
+  box(0.45, 0.45, 0.26, 0, 0.77, 0);          // torso lower
+  cyl(0.18, 0.14, 0.55, -0.38, 1.02, 0);      // L upper arm
+  cyl(0.14, 0.12, 0.5,  -0.46, 0.53, 0);      // L forearm
+  cyl(0.18, 0.14, 0.55,  0.38, 1.02, 0);      // R upper arm
+  cyl(0.14, 0.12, 0.5,   0.46, 0.53, 0);      // R forearm
+  cyl(0.17, 0.14, 0.5,  -0.16, 0.32, 0);      // L thigh
+  cyl(0.14, 0.12, 0.48, -0.16,-0.16, 0);      // L shin
+  cyl(0.17, 0.14, 0.5,   0.16, 0.32, 0);      // R thigh
+  cyl(0.14, 0.12, 0.48,  0.16,-0.16, 0);      // R shin
+  box(0.22, 0.08, 0.38, -0.16,-0.44, 0.08);   // L foot
+  box(0.22, 0.08, 0.38,  0.16,-0.44, 0.08);   // R foot
+
+  // Wireframe overlay on torso to suggest mesh
+  const wireTorso = new THREE.Mesh(
+    new THREE.BoxGeometry(0.53, 0.62, 0.30),
+    new THREE.MeshStandardMaterial({ color: 0x38bdf8, wireframe: true, opacity: 0.3, transparent: true })
+  );
+  wireTorso.position.set(0, 1.25, 0);
+  scene.add(wireTorso);
+
+  // ── Orbit controls (manual, no import needed) ──
+  let isDragging = false, isRight = false;
+  let prevX = 0, prevY = 0;
+  let theta = 0, phi = Math.PI / 6;
+  let radius = 3.5;
+  let targetX = 0, targetY = 1.0;
+
+  const domEl = renderer.domElement;
+
+  domEl.addEventListener('mousedown', e => {
+    isDragging = true; isRight = e.button === 2;
+    prevX = e.clientX; prevY = e.clientY;
+  });
+  domEl.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('mouseup', () => isDragging = false);
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - prevX, dy = e.clientY - prevY;
+    prevX = e.clientX; prevY = e.clientY;
+    if (isRight) {
+      targetX -= dx * 0.005;
+      targetY += dy * 0.005;
+    } else {
+      theta -= dx * 0.008;
+      phi = Math.max(0.05, Math.min(Math.PI / 2, phi + dy * 0.006));
+    }
+  });
+  domEl.addEventListener('wheel', e => {
+    radius = Math.max(1, Math.min(12, radius + e.deltaY * 0.005));
+  });
+
+  // Touch support
+  let lastTouchX = 0, lastTouchY = 0;
+  domEl.addEventListener('touchstart', e => { lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY; });
+  domEl.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - lastTouchX;
+    const dy = e.touches[0].clientY - lastTouchY;
+    lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY;
+    theta -= dx * 0.01; phi = Math.max(0.05, Math.min(Math.PI/2, phi + dy*0.008));
+  }, { passive: false });
+
+  // Auto-rotate on idle
+  let lastInteract = Date.now();
+  ['mousedown','touchstart','wheel'].forEach(ev => domEl.addEventListener(ev, () => lastInteract = Date.now()));
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (Date.now() - lastInteract > 3000) theta += 0.005;
+    camera.position.x = targetX + radius * Math.sin(theta) * Math.cos(phi);
+    camera.position.y = targetY + radius * Math.sin(phi);
+    camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+    camera.lookAt(targetX, targetY, 0);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    const nw = mount.clientWidth, nh = mount.clientHeight;
+    camera.aspect = nw / nh;
+    camera.updateProjectionMatrix();
+    renderer.setSize(nw, nh);
+  });
+}
+</script>
+</body>
+</html>
