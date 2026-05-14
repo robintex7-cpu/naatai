@@ -38,7 +38,7 @@ services:
       DEBUG:           "false"
       STORAGE_PATH:    /app/storage
       ALLOWED_ORIGINS: '["*"]'
-      AI_SERVICE_URL:  http://ai_service:8001
+      AI_SERVICE_URL:  http://ai_service:8081
     volumes:
       - ./backend:/app
       - storage_data:/app/storage
@@ -51,7 +51,7 @@ services:
         condition: service_started
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 
-  # ── AI / ML Service  (port 8001) ──────────────────────────────────
+  # ── AI / ML Service  (port 8081) ──────────────────────────────────
   # Build from the naatai-ai repo (clone it alongside this repo):
   #   git clone https://github.com/robintex7-cpu/naatai-ai ../naatai-ai
   ai_service:
@@ -66,9 +66,9 @@ services:
       - storage_data:/app/storage
       - ./models:/app/models:ro
     ports:
-      - "8001:8001"
+      - "8081:8081"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
       interval: 10s
       timeout: 5s
       retries: 5

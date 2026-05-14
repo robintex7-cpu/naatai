@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     MAX_VIDEO_SIZE_MB: int = 200
     MAX_IMAGE_SIZE_MB: int = 20
 
-    # AI service (ML processing — runs on port 8001)
-    AI_SERVICE_URL: str = "http://localhost:8001"
+    # AI service (ML processing — runs on port 8081)
+    AI_SERVICE_URL: str = "http://localhost:8081"
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
