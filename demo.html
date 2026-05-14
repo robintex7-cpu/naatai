@@ -66,7 +66,15 @@ progress-bar,.pbar{height:8px;background:#1a2540;border-radius:99px;overflow:hid
 <!-- PAGE 1: LANGUAGE SELECTION -->
 <div id="p-lang" class="page vc active" style="padding:32px;background:radial-gradient(ellipse at 50% 0%,#0f2036 0%,#0a0f1a 70%)">
   <div style="max-width:440px;width:100%;text-align:center">
-    <div style="font-size:52px;font-weight:900;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">NaatAI</div>
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+      <svg width="58" height="58" viewBox="0 0 32 32" fill="none" style="margin-right:10px;filter:drop-shadow(0 0 8px rgba(56,189,248,0.35))">
+        <circle cx="16" cy="16" r="15.5" fill="#0d1628" stroke="rgba(255,255,255,0.18)" stroke-width="0.7"/>
+        <circle cx="16" cy="16" r="15.5" fill="none" stroke="url(#ng)" stroke-width="1.2"/>
+        <defs><linearGradient id="ng" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs>
+        <path d="M10 23V9l6 12V9M16 23V9l6 12V9" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="font-size:52px;font-weight:900;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">NaatAI</div>
+    </div>
     <p style="color:#64748b;margin-bottom:32px;font-size:14px">Professional Body Measurement &amp; 3D Scanning</p>
     <p style="font-size:15px;font-weight:700;color:#94a3b8;margin-bottom:16px">Choose Your Language / Sprache wählen</p>
     <div class="lang-g">
@@ -245,23 +253,63 @@ progress-bar,.pbar{height:8px;background:#1a2540;border-radius:99px;overflow:hid
 </div>
 
 <!-- PAGE 7: CAMERA RECORDING -->
-<div id="p-rec" class="page" style="position:relative;background:#000">
-  <video id="vid" autoplay muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.4"></video>
-  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
-    <svg viewBox="0 0 200 500" style="height:65%;opacity:.18" fill="none" stroke="white" stroke-width="2.5">
-      <ellipse cx="100" cy="50" rx="35" ry="40"/>
-      <line x1="100" y1="90" x2="100" y2="280"/>
-      <line x1="100" y1="130" x2="40" y2="220"/><line x1="100" y1="130" x2="160" y2="220"/>
-      <line x1="100" y1="280" x2="65" y2="460"/><line x1="100" y1="280" x2="135" y2="460"/>
+<div id="p-rec" class="page" style="position:relative;background:#000;overflow:hidden">
+  <video id="vid" autoplay muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.45"></video>
+
+  <!-- Body silhouette frame -->
+  <div id="body-frame" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1">
+    <svg id="body-sil" viewBox="0 0 180 480" style="height:78%;max-height:85vh" fill="none">
+      <defs>
+        <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <linearGradient id="silGrad" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop offset="0" stop-color="#38bdf8" stop-opacity="0.9"/>
+          <stop offset="1" stop-color="#818cf8" stop-opacity="0.7"/>
+        </linearGradient>
+      </defs>
+      <!-- Head -->
+      <ellipse cx="90" cy="42" rx="28" ry="34" stroke="url(#silGrad)" stroke-width="2.5" stroke-dasharray="6 3" filter="url(#glow)"/>
+      <!-- Neck -->
+      <path d="M78 74 Q90 82 102 74" stroke="url(#silGrad)" stroke-width="2" fill="none"/>
+      <!-- Shoulders & torso -->
+      <path d="M34 108 Q18 100 28 82 Q55 70 78 74 Q90 82 102 74 Q125 70 152 82 Q162 100 146 108 L148 260 Q148 280 130 284 Q90 290 50 284 Q32 280 32 260 Z" stroke="url(#silGrad)" stroke-width="2.5" stroke-dasharray="6 3" fill="rgba(56,189,248,0.04)" filter="url(#glow)"/>
+      <!-- Left arm -->
+      <path d="M34 108 Q20 140 22 200 Q22 216 34 220 Q46 224 50 208 L50 108" stroke="url(#silGrad)" stroke-width="2" stroke-dasharray="5 3" fill="rgba(56,189,248,0.03)"/>
+      <!-- Right arm -->
+      <path d="M146 108 Q160 140 158 200 Q158 216 146 220 Q134 224 130 208 L130 108" stroke="url(#silGrad)" stroke-width="2" stroke-dasharray="5 3" fill="rgba(56,189,248,0.03)"/>
+      <!-- Left leg -->
+      <path d="M50 284 Q44 340 42 400 Q40 440 50 448 Q62 456 70 444 Q74 420 76 380 L80 284" stroke="url(#silGrad)" stroke-width="2" stroke-dasharray="5 3" fill="rgba(56,189,248,0.03)"/>
+      <!-- Right leg -->
+      <path d="M130 284 Q136 340 138 400 Q140 440 130 448 Q118 456 110 444 Q106 420 104 380 L100 284" stroke="url(#silGrad)" stroke-width="2" stroke-dasharray="5 3" fill="rgba(56,189,248,0.03)"/>
+      <!-- Feet -->
+      <ellipse cx="56" cy="454" rx="18" ry="9" stroke="url(#silGrad)" stroke-width="1.5" opacity="0.6"/>
+      <ellipse cx="124" cy="454" rx="18" ry="9" stroke="url(#silGrad)" stroke-width="1.5" opacity="0.6"/>
+      <!-- Corner markers -->
+      <path d="M10 10 L10 40 M10 10 L40 10" stroke="#38bdf8" stroke-width="2.5" opacity="0.6"/>
+      <path d="M170 10 L170 40 M170 10 L140 10" stroke="#38bdf8" stroke-width="2.5" opacity="0.6"/>
+      <path d="M10 470 L10 440 M10 470 L40 470" stroke="#38bdf8" stroke-width="2.5" opacity="0.6"/>
+      <path d="M170 470 L170 440 M170 470 L140 470" stroke="#38bdf8" stroke-width="2.5" opacity="0.6"/>
     </svg>
   </div>
-  <div style="position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:7px;z-index:2">
+
+  <!-- Guidance overlay (shown before recording) -->
+  <div id="guide-overlay" style="position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:none;padding-bottom:24px">
+    <div id="guide-msg" style="background:rgba(0,0,0,0.82);border:1.5px solid #38bdf8;border-radius:20px;padding:16px 32px;text-align:center;max-width:300px">
+      <p id="guide-arrow" style="font-size:38px;margin-bottom:4px">⬆️</p>
+      <p id="guide-text" style="font-size:20px;font-weight:800;color:#fff;margin-bottom:2px">Step Back</p>
+      <p id="guide-sub" style="font-size:12px;color:#94a3b8">Move away from the camera</p>
+    </div>
+  </div>
+
+  <!-- REC indicator (hidden until actual recording) -->
+  <div id="rec-indicator" style="position:absolute;top:14px;left:14px;display:none;align-items:center;gap:7px;z-index:4">
     <span class="recdot"></span><span style="font-size:11px;color:#fca5a5;font-weight:700;letter-spacing:.08em">REC</span>
   </div>
-  <div style="position:absolute;top:14px;right:14px;z-index:2">
+  <div style="position:absolute;top:14px;right:14px;z-index:4">
     <button onclick="stopCapture()" style="background:rgba(239,68,68,.9);border:none;border-radius:8px;color:#fff;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">Stop &amp; Analyse</button>
   </div>
-  <div style="position:absolute;inset-x:0;bottom:0;z-index:2;padding:20px;background:linear-gradient(to top,rgba(0,0,0,.95),transparent)">
+
+  <!-- Recording steps (hidden until guidance done) -->
+  <div id="rec-controls" style="display:none;position:absolute;inset-x:0;bottom:0;z-index:4;padding:20px;background:linear-gradient(to top,rgba(0,0,0,.95),transparent)">
     <p id="rec-instr" style="font-size:22px;font-weight:800;text-align:center;margin-bottom:4px">Get Ready</p>
     <p id="rec-sub" style="font-size:13px;color:#94a3b8;text-align:center;margin-bottom:16px">Stand 2–3 metres away. Arms slightly out.</p>
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
@@ -531,6 +579,11 @@ progress-bar,.pbar{height:8px;background:#1a2540;border-radius:99px;overflow:hid
 
 <script>
 let currentLang='en',currentToken='',isAdmin=false;
+// Inject logo SVG into all .logo spans
+(function(){
+  const S=`<svg width="20" height="20" viewBox="0 0 32 32" fill="none" style="display:inline-block;vertical-align:-5px;margin-right:5px;flex-shrink:0;filter:drop-shadow(0 0 4px rgba(56,189,248,0.3))"><circle cx="16" cy="16" r="15.5" fill="#0d1628" stroke="rgba(255,255,255,0.15)" stroke-width="0.6"/><circle cx="16" cy="16" r="15.5" fill="none" stroke="url(#ng2)" stroke-width="1"/><defs><linearGradient id="ng2" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs><path d="M10 23V9l6 12V9M16 23V9l6 12V9" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  document.querySelectorAll('.logo').forEach(el=>{el.innerHTML=S+el.textContent;});
+})();
 let profile='',bodyPart='',method='',selectedPipeline='naatai',captureSource='camera';
 let frontImgData=null,backImgData=null,measurementUnit='cm';
 let savedRecords=[];
@@ -634,10 +687,43 @@ const REC_STEPS=[
 ];
 const REC_TOTAL=REC_STEPS.reduce((a,s)=>a+s.d,0);
 
+const GUIDE_PHASES=[
+  {arrow:'⬅️',text:'Move Left',sub:'Shift to the left so you\'re centred',dur:2000,color:'#f59e0b'},
+  {arrow:'➡️',text:'Move Right',sub:'Shift a little to the right',dur:1800,color:'#f59e0b'},
+  {arrow:'⬆️',text:'Step Back',sub:'Move further from the camera',dur:2200,color:'#38bdf8'},
+  {arrow:'✅',text:'Perfect! Stand Still',sub:'Great position — hold it there',dur:1800,color:'#4ade80'},
+  {arrow:'🔴',text:'Recording Now',sub:'Stay still and turn slowly',dur:1200,color:'#ef4444'},
+];
+async function runGuidancePhases(){
+  const overlay=document.getElementById('guide-overlay');
+  const silEl=document.getElementById('body-sil');
+  const arrow=document.getElementById('guide-arrow');
+  const txt=document.getElementById('guide-text');
+  const sub=document.getElementById('guide-sub');
+  const msg=document.getElementById('guide-msg');
+  overlay.style.display='flex';
+  for(const ph of GUIDE_PHASES){
+    arrow.textContent=ph.arrow;
+    txt.textContent=ph.text;
+    sub.textContent=ph.sub;
+    msg.style.borderColor=ph.color;
+    txt.style.color=ph.color;
+    if(silEl){silEl.style.filter=ph.arrow==='✅'?'drop-shadow(0 0 12px #4ade80)':ph.arrow==='🔴'?'drop-shadow(0 0 12px #ef4444)':'none';}
+    await new Promise(r=>setTimeout(r,ph.dur));
+  }
+  overlay.style.display='none';
+  if(silEl)silEl.style.filter='none';
+  document.getElementById('rec-indicator').style.display='flex';
+  document.getElementById('rec-controls').style.display='block';
+}
 async function startRecording(){
   show('p-rec');
+  document.getElementById('guide-overlay').style.display='none';
+  document.getElementById('rec-indicator').style.display='none';
+  document.getElementById('rec-controls').style.display='none';
   let stream=null;
   try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});const v=document.getElementById('vid');v.srcObject=stream;v.play();}catch(e){}
+  await runGuidancePhases();
   const dots=document.getElementById('rec-dots');
   dots.innerHTML=REC_STEPS.map((_,i)=>`<div id="rdot${i}" style="width:9px;height:9px;border-radius:50%;background:#334155;transition:.3s"></div>`).join('');
   let elapsed=0;
@@ -716,7 +802,7 @@ function showClothResult(){
 
 // ---- MEASUREMENTS DATA ----
 const MOCK_MEASUREMENTS={
-  man:{full:[{l:'Height',v:'178 cm'},{l:'Chest',v:'102 cm'},{l:'Waist',v:'86 cm'},{l:'Hips',v:'98 cm'},{l:'Shoulder Width',v:'46 cm'},{l:'Sleeve Length',v:'64 cm'},{l:'Neck',v:'40 cm'},{l:'Inseam',v:'82 cm'},{l:'Thigh',v:'58 cm'},{l:'Calf',v:'38 cm'},{l:'Ankle',v:'24 cm'}],
+  man:{full:[{l:'Height',v:'168 cm'},{l:'Chest',v:'102 cm'},{l:'Waist',v:'86 cm'},{l:'Hips',v:'98 cm'},{l:'Shoulder Width',v:'46 cm'},{l:'Sleeve Length',v:'64 cm'},{l:'Neck',v:'40 cm'},{l:'Inseam',v:'82 cm'},{l:'Thigh',v:'58 cm'},{l:'Calf',v:'38 cm'},{l:'Ankle',v:'24 cm'}],
     top:[{l:'Chest',v:'102 cm'},{l:'Shoulder Width',v:'46 cm'},{l:'Sleeve Length',v:'64 cm'},{l:'Neck',v:'40 cm'},{l:'Back Width',v:'44 cm'},{l:'Arm Length',v:'62 cm'}],
     bottom:[{l:'Waist',v:'86 cm'},{l:'Hips',v:'98 cm'},{l:'Inseam',v:'82 cm'},{l:'Thigh',v:'58 cm'},{l:'Knee',v:'42 cm'},{l:'Ankle',v:'24 cm'},{l:'Rise',v:'28 cm'}]},
   woman:{full:[{l:'Height',v:'165 cm'},{l:'Bust',v:'92 cm'},{l:'Under Bust',v:'78 cm'},{l:'Waist',v:'74 cm'},{l:'Hips',v:'100 cm'},{l:'Shoulder Width',v:'38 cm'},{l:'Sleeve Length',v:'58 cm'},{l:'Neck',v:'34 cm'},{l:'Inseam',v:'76 cm'},{l:'Thigh',v:'56 cm'},{l:'Calf',v:'36 cm'}],
@@ -887,12 +973,70 @@ function initViewer(){
       const fz=z3+FOV,f=SC*FOV/fz;
       return{sx:CX+x2*f,sy:CY-(y3-1.1)*f,depth:z3};
     });
-    [...E].sort((a,b)=>(P[a[0]].depth+P[a[1]].depth)-(P[b[0]].depth+P[b[1]].depth)).forEach(([a,b])=>{
-      const pa=P[a],pb=P[b],d=(pa.depth+pb.depth)/2,br=Math.max(.05,.9-d*.1);
-      ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.strokeStyle=`rgba(${accent},${br*.13})`;ctx.lineWidth=5;ctx.stroke();
-      ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.strokeStyle=`rgba(${accent},${br*.85})`;ctx.lineWidth=1;ctx.stroke();
+    // Build solid quads from ring connections (painter's algorithm)
+    const QUADS=[];
+    RC.forEach(([ra,rb])=>{
+      const sa=RI[ra],sb=RI[rb];
+      for(let i=0;i<N;i++){const ni=(i+1)%N;QUADS.push([sa+i,sa+ni,sb+ni,sb+i]);}
     });
-    P.forEach(p=>{const br=Math.max(.05,.9-p.depth*.1);ctx.beginPath();ctx.arc(p.sx,p.sy,1.5,0,Math.PI*2);ctx.fillStyle=`rgba(${accent},${br})`;ctx.fill();});
+    // Sort back-to-front by average depth
+    QUADS.sort((qa,qb)=>{
+      const da=(P[qa[0]].depth+P[qa[1]].depth+P[qa[2]].depth+P[qa[3]].depth)*.25;
+      const db=(P[qb[0]].depth+P[qb[1]].depth+P[qb[2]].depth+P[qb[3]].depth)*.25;
+      return da-db;
+    });
+    QUADS.forEach(([i0,i1,i2,i3])=>{
+      const pa=P[i0],pb=P[i1],pc=P[i2],pd=P[i3];
+      // Normal via screen-space cross product to cull back faces
+      const ex=pc.sx-pa.sx,ey=pc.sy-pa.sy,fx=pd.sx-pb.sx,fy=pd.sy-pb.sy;
+      const cross=ex*fy-ey*fx;
+      const avgD=(pa.depth+pb.depth+pc.depth+pd.depth)*.25;
+      const br=Math.max(.08,Math.min(.92,.75-avgD*.1));
+      const opacity=cross>0?br*.55:br*.22;
+      ctx.beginPath();
+      ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.lineTo(pc.sx,pc.sy);ctx.lineTo(pd.sx,pd.sy);
+      ctx.closePath();
+      // Gradient fill: lighter on front, darker on back
+      ctx.fillStyle=`rgba(${accent},${opacity})`;
+      ctx.fill();
+      // Subtle edge
+      ctx.strokeStyle=`rgba(${accent},${br*.28})`;
+      ctx.lineWidth=0.4;
+      ctx.stroke();
+    });
+    // Draw measurement labels on mesh
+    const meas=getMockMeasurements();
+    const measMap={};meas.forEach(m=>measMap[m.l]=m.v);
+    const MEAS_RINGS=[
+      {ri:2,key:'Neck',altKey:'Neck',side:-1},
+      {ri:8,key:'Chest',altKey:'Bust',side:1},
+      {ri:10,key:'Waist',altKey:'Waist',side:-1},
+      {ri:11,key:'Hips',altKey:'Hips',side:1},
+      {ri:24,key:'Thigh',altKey:'Thigh',side:-1},
+    ];
+    MEAS_RINGS.forEach(({ri,key,altKey,side})=>{
+      const [cx,cy,cz]=R[ri];
+      const x2=cx*Math.cos(theta)+cz*Math.sin(theta);
+      const z2=-cx*Math.sin(theta)+cz*Math.cos(theta);
+      const y3=cy*Math.cos(phi)-z2*Math.sin(phi);
+      const z3=cy*Math.sin(phi)+z2*Math.cos(phi);
+      const fz=z3+FOV,f=SC*FOV/fz;
+      const sx=CX+x2*f,sy=CY-(y3-1.1)*f;
+      const val=measMap[key]||measMap[altKey];
+      if(!val)return;
+      const rx=R[ri][3],rz=R[ri][4];
+      const halfW=Math.max(rx,rz)*f*1.1;
+      const lx=sx+(side>0?halfW+12:-halfW-12);
+      ctx.beginPath();ctx.moveTo(sx+(side>0?halfW:-halfW),sy);ctx.lineTo(lx,sy);
+      ctx.strokeStyle=`rgba(${accent},.6)`;ctx.lineWidth=1;ctx.stroke();
+      ctx.beginPath();ctx.arc(lx,sy,2.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${accent},.9)`;ctx.fill();
+      ctx.font=`bold ${Math.round(9*dpr)/dpr}px system-ui`;
+      ctx.fillStyle=`rgba(${accent},1)`;
+      ctx.textAlign=side>0?'left':'right';
+      ctx.textBaseline='middle';
+      ctx.fillText(`${key}: ${val}`,lx+(side>0?6:-6),sy);
+    });
     scanY+=scanDir*1.2;if(scanY>H*.95)scanDir=-1;if(scanY<H*.03)scanDir=1;
     const sg=ctx.createLinearGradient(0,scanY-10,0,scanY+10);
     sg.addColorStop(0,`rgba(${accent},0)`);sg.addColorStop(.5,`rgba(${accent},${.32+.18*Math.sin(Date.now()*.004)})`);sg.addColorStop(1,`rgba(${accent},0)`);
