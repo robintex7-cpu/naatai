@@ -33,6 +33,9 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "experiments": {
+      "baseUrl": "/naatai"
+    },
     "plugins": [
       "expo-router",
       "expo-camera",
