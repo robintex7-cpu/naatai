@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Design – NAATAI</title>
+  <meta name="description" content="Design your perfect pair of jeans. Choose fabric, details, and enter your measurements for a made-to-order fit." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="configurator.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar scrolled" id="navbar">
+    <div class="navbar__inner">
+      <nav class="navbar__left">
+        <a href="../index.html#" class="nav-link">WOMEN</a>
+        <a href="../index.html#" class="nav-link">MEN</a>
+        <a href="../index.html#new-arrivals" class="nav-link">NEW ARRIVALS</a>
+      </nav>
+      <a href="../index.html" class="navbar__logo" style="color:var(--navy)">NAATAI</a>
+      <div class="navbar__right">
+        <button class="icon-btn" style="color:var(--navy)" aria-label="Search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+        <button class="icon-btn cart-btn" style="color:var(--navy)" aria-label="Cart">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-count">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="navbar__border"></div>
+  </header>
+
+  <!-- PAGE HERO -->
+  <section class="cfg-hero">
+    <div class="cfg-hero__inner">
+      <p class="section-eyebrow">Made to Order</p>
+      <h1 class="cfg-hero__title">Design Your<br /><em>Perfect Jeans</em></h1>
+      <p class="cfg-hero__sub">Every pair cut and stitched to your exact measurements and style preferences.</p>
+    </div>
+  </section>
+
+  <!-- STEP INDICATOR -->
+  <div class="steps-bar">
+    <div class="steps-bar__inner">
+      <button class="step-btn active" data-step="1">
+        <span class="step-btn__num">01</span>
+        <span class="step-btn__label">Design</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="2">
+        <span class="step-btn__num">02</span>
+        <span class="step-btn__label">Measurements</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="3">
+        <span class="step-btn__num">03</span>
+        <span class="step-btn__label">Account</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="4">
+        <span class="step-btn__num">04</span>
+        <span class="step-btn__label">Checkout</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONFIGURATOR BODY -->
+  <main class="cfg-body">
+    <div class="cfg-layout">
+
+      <!-- LEFT: Steps -->
+      <div class="cfg-steps">
+
+        <!-- STEP 1: Design -->
+        <section class="cfg-step active" id="step-1">
+          <h2 class="cfg-step__title">Choose Your Fabric</h2>
+
+          <div class="fabric-grid">
+            <label class="fabric-card">
+              <input type="radio" name="fabric" value="blue" checked />
+              <div class="fabric-card__swatch fabric-card__swatch--blue"></div>
+              <div class="fabric-card__info">
+                <span class="fabric-card__name">Naatai Blue</span>
+                <span class="fabric-card__price">€99</span>
+              </div>
+              <span class="fabric-card__check">✓</span>
+            </label>
+            <label class="fabric-card">
+              <input type="radio" name="fabric" value="black" />
+              <div class="fabric-card__swatch fabric-card__swatch--black"></div>
+              <div class="fabric-card__info">
+                <span class="fabric-card__name">Naatai Black</span>
+                <span class="fabric-card__price">€99</span>
+              </div>
+              <span class="fabric-card__check">✓</span>
+            </label>
+          </div>
+
+          <!-- FRONT ELEMENTS -->
+          <div class="cfg-section">
+            <h3 class="cfg-section__title">Front Elements</h3>
+
+            <div class="option-group">
+              <p class="option-group__label">Front Pocket Style</p>
+              <div class="option-row">
+                <label class="opt-chip">
+                  <input type="radio" name="front-pocket" value="classic" checked />
+                  <span>Classic</span>
+                </label>
+                <label class="opt-chip">
+                  <input type="radio" name="front-pocket" value="slash" />
+                  <span>Slash</span>
+                </label>
+                <label class="opt-chip">
+                  <input type="radio" name="front-pocket" value="none" />
+                  <span>No Pocket</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="option-group">
+              <p class="option-group__label">Coin Pocket</p>
+              <div class="option-row">
+                <label class="opt-chip">
+                  <input type="radio" name="coin-pocket" value="yes" checked />
+                  <span>Include</span>
+                </label>
+                <label class="opt-chip">
+                  <input type="radio" name="coin-pocket" value="no" />
+                  <span>Exclude</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="option-group">
+              <p class="option-group__label">Front Design Add-ons</p>
+              <div class="addon-list">
+                <label class="addon-item">
+                  <input type="checkbox" name="addon" value="13" data-label="Whisker Jeans with 3D" />
+                  <div class="addon-item__text">
+                    <span class="addon-item__name">Whisker Jeans with 3D</span>
+                    <span class="addon-item__desc">Authentic worn-in creasing effect</span>
+                  </div>
+                  <span class="addon-item__price">+€13</span>
+                </label>
+                <label class="addon-item">
+                  <input type="checkbox" name="addon" value="9" data-label="Whisker with Destroy" />
+                  <div class="addon-item__text">
+                    <span class="addon-item__name">Whisker with Destroy</span>
+                    <span class="addon-item__desc">Distressed &amp; destroyed finish</span>
+                  </div>
+                  <span class="addon-item__price">+€9</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- BACK ELEMENTS -->
+          <div class="cfg-section">
+            <h3 class="cfg-section__title">Back Elements</h3>
+
+            <div class="option-group">
+              <p class="option-group__label">Back Pocket Style</p>
+              <div class="addon-list">
+                <label class="addon-item">
+                  <input type="radio" name="back-pocket" value="standard" checked />
+                  <div class="addon-item__text">
+                    <span class="addon-item__name">Standard Pocket</span>
+                    <span class="addon-item__desc">Classic back pocket with stitching</span>
+                  </div>
+                  <span class="addon-item__price">€29</span>
+                </label>
+                <label class="addon-item">
+                  <input type="radio" name="back-pocket" value="simple" />
+                  <div class="addon-item__text">
+                    <span class="addon-item__name">Simple Pocket</span>
+                    <span class="addon-item__desc">Clean minimal pocket</span>
+                  </div>
+                  <span class="addon-item__price">€3</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="option-group">
+              <p class="option-group__label">Back Design Add-ons</p>
+              <div class="addon-list">
+                <label class="addon-item">
+                  <input type="checkbox" name="addon" value="9" data-label="Whisker with 3D in Knee" />
+                  <div class="addon-item__text">
+                    <span class="addon-item__name">Whisker with 3D in Knee</span>
+                    <span class="addon-item__desc">3D knee whisker detailing</span>
+                  </div>
+                  <span class="addon-item__price">+€9</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- FLY -->
+          <div class="cfg-section">
+            <h3 class="cfg-section__title">Fly Closure</h3>
+            <div class="option-row">
+              <label class="opt-chip opt-chip--lg">
+                <input type="radio" name="fly" value="zipper" checked />
+                <span>Zipper</span>
+              </label>
+              <label class="opt-chip opt-chip--lg">
+                <input type="radio" name="fly" value="button" />
+                <span>Button Fly</span>
+              </label>
+            </div>
+          </div>
+
+          <button class="btn btn--gold cfg-step__next" data-next="2">Continue to Measurements →</button>
+        </section>
+
+        <!-- STEP 2: Measurements -->
+        <section class="cfg-step" id="step-2">
+          <h2 class="cfg-step__title">Your Measurements</h2>
+          <p class="cfg-step__desc">All measurements in <strong>centimetres</strong>. Keep the tape firm and start from the beginning of the tape.</p>
+
+          <div class="measure-tip">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p>For the most accurate fit, have someone else take your measurements while you stand straight.</p>
+          </div>
+
+          <div class="measure-grid">
+            <div class="measure-field">
+              <label class="measure-field__label">Waist <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 82" min="50" max="150" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Hip <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 96" min="60" max="160" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Crotch <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 28" min="20" max="50" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Thigh <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 58" min="30" max="90" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Knee <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 40" min="20" max="70" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Knee Distance <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 55" min="30" max="80" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Calf <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 38" min="20" max="60" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Calf Distance <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 35" min="20" max="60" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Ankle <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 22" min="15" max="40" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Length <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 105" min="70" max="130" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Height <span>cm</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 178" min="140" max="220" />
+            </div>
+            <div class="measure-field">
+              <label class="measure-field__label">Weight <span>kg</span></label>
+              <input type="number" class="measure-field__input" placeholder="e.g. 75" min="40" max="200" />
+            </div>
+          </div>
+
+          <div class="measure-guide">
+            <h4 class="measure-guide__title">How to measure</h4>
+            <ul class="measure-guide__list">
+              <li><strong>Waist:</strong> Measure around your natural waistline, above the hip bone.</li>
+              <li><strong>Hip:</strong> Measure around the fullest part of your hips and seat.</li>
+              <li><strong>Crotch:</strong> Sit on a flat chair, measure from waist down to the chair seat.</li>
+              <li><strong>Thigh:</strong> Measure around the fullest part of your thigh.</li>
+              <li><strong>Knee:</strong> Measure around the knee while slightly bent.</li>
+              <li><strong>Length:</strong> Measure from waist to the bottom of your ankle bone.</li>
+            </ul>
+          </div>
+
+          <div class="cfg-step__nav">
+            <button class="btn btn--outline-navy cfg-step__back" data-prev="1">← Back</button>
+            <button class="btn btn--gold cfg-step__next" data-next="3">Continue to Account →</button>
+          </div>
+        </section>
+
+        <!-- STEP 3: Account -->
+        <section class="cfg-step" id="step-3">
+          <h2 class="cfg-step__title">Account</h2>
+          <p class="cfg-step__desc">Sign in or create an account to save your order.</p>
+
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Sign In</button>
+            <button class="auth-tab" data-tab="register">Create Account</button>
+          </div>
+
+          <form class="auth-form" id="login-form">
+            <div class="form-field">
+              <label class="form-field__label">Email Address</label>
+              <input type="email" class="form-field__input" placeholder="you@example.com" />
+            </div>
+            <div class="form-field">
+              <label class="form-field__label">Password</label>
+              <input type="password" class="form-field__input" placeholder="••••••••" />
+            </div>
+            <a href="#" class="form-field__forgot">Forgot password?</a>
+          </form>
+
+          <form class="auth-form hidden" id="register-form">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="form-field__label">First Name</label>
+                <input type="text" class="form-field__input" placeholder="Max" />
+              </div>
+              <div class="form-field">
+                <label class="form-field__label">Last Name</label>
+                <input type="text" class="form-field__input" placeholder="Müller" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="form-field__label">Email Address</label>
+              <input type="email" class="form-field__input" placeholder="you@example.com" />
+            </div>
+            <div class="form-field">
+              <label class="form-field__label">Password</label>
+              <input type="password" class="form-field__input" placeholder="Min. 8 characters" />
+            </div>
+          </form>
+
+          <div class="cfg-step__nav">
+            <button class="btn btn--outline-navy cfg-step__back" data-prev="2">← Back</button>
+            <button class="btn btn--gold cfg-step__next" data-next="4">Continue to Checkout →</button>
+          </div>
+        </section>
+
+        <!-- STEP 4: Checkout -->
+        <section class="cfg-step" id="step-4">
+          <h2 class="cfg-step__title">Delivery &amp; Payment</h2>
+
+          <div class="cfg-section">
+            <h3 class="cfg-section__title">Delivery Address</h3>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="form-field__label">First Name</label>
+                <input type="text" class="form-field__input" />
+              </div>
+              <div class="form-field">
+                <label class="form-field__label">Last Name</label>
+                <input type="text" class="form-field__input" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="form-field__label">Street Address</label>
+              <input type="text" class="form-field__input" />
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="form-field__label">Postcode</label>
+                <input type="text" class="form-field__input" />
+              </div>
+              <div class="form-field">
+                <label class="form-field__label">City</label>
+                <input type="text" class="form-field__input" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="form-field__label">Country</label>
+              <select class="form-field__input">
+                <option>Germany</option>
+                <option>Austria</option>
+                <option>Switzerland</option>
+                <option>Netherlands</option>
+                <option>Belgium</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="same-address-check">
+            <input type="checkbox" id="same-billing" checked />
+            <span>Billing address same as delivery</span>
+          </label>
+
+          <div class="cfg-section">
+            <h3 class="cfg-section__title">Payment Method</h3>
+            <div class="payment-methods">
+              <label class="payment-opt">
+                <input type="radio" name="payment" value="card" checked />
+                <span class="payment-opt__label">Credit / Debit Card</span>
+                <div class="payment-opt__icons">
+                  <span class="pay-icon">VISA</span>
+                  <span class="pay-icon">MC</span>
+                  <span class="pay-icon">AMEX</span>
+                </div>
+              </label>
+              <label class="payment-opt">
+                <input type="radio" name="payment" value="paypal" />
+                <span class="payment-opt__label">PayPal</span>
+                <div class="payment-opt__icons">
+                  <span class="pay-icon">PayPal</span>
+                </div>
+              </label>
+              <label class="payment-opt">
+                <input type="radio" name="payment" value="apple" />
+                <span class="payment-opt__label">Apple Pay</span>
+                <div class="payment-opt__icons">
+                  <span class="pay-icon"> Pay</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="cfg-step__nav">
+            <button class="btn btn--outline-navy cfg-step__back" data-prev="3">← Back</button>
+            <button class="btn btn--gold" id="place-order">Place Order →</button>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- RIGHT: Order Summary -->
+      <aside class="cfg-summary">
+        <div class="cfg-summary__inner">
+          <h3 class="cfg-summary__title">Your Order</h3>
+          <p class="cfg-summary__product">Man Custom Pant</p>
+
+          <div class="summary-lines" id="summary-lines">
+            <div class="summary-line">
+              <span>Base fabric</span>
+              <span id="summary-fabric">€99</span>
+            </div>
+            <div class="summary-line" id="line-back-pocket">
+              <span>Back pocket</span>
+              <span>€29</span>
+            </div>
+          </div>
+
+          <div class="summary-addons" id="summary-addons"></div>
+
+          <div class="summary-total">
+            <span>Total</span>
+            <span id="summary-total">€128</span>
+          </div>
+
+          <div class="summary-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Made to order · Ships in 3–5 weeks</span>
+          </div>
+          <div class="summary-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Free shipping to Germany</span>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- SUCCESS MODAL -->
+  <div class="modal-backdrop hidden" id="success-modal">
+    <div class="modal">
+      <div class="modal__icon">✓</div>
+      <h2 class="modal__title">Order Placed!</h2>
+      <p class="modal__body">Thank you for your custom order. We’ll email your invoice and production updates to your inbox. Your jeans will be crafted and shipped within <strong>3–5 weeks</strong>.</p>
+      <a href="../index.html" class="btn btn--gold" style="margin-top:8px">Back to Shop</a>
+    </div>
+  </div>
+
+  <script src="configurator.js"></script>
+</body>
+</html>
