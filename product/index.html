@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product – NAATAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="product.css" />
+</head>
+<body>
+  <header class="navbar scrolled" id="navbar">
+    <div class="navbar__inner">
+      <nav class="navbar__left">
+        <a href="../women/" class="nav-link">WOMEN</a>
+        <a href="../men/" class="nav-link">MEN</a>
+        <a href="../index.html#new-arrivals" class="nav-link">NEW ARRIVALS</a>
+        <a href="../custom-design/" class="nav-link" style="color:var(--gold)">CUSTOM DESIGN</a>
+      </nav>
+      <a href="../index.html" class="navbar__logo" style="color:var(--navy)">NAATAI</a>
+      <div class="navbar__right">
+        <button class="icon-btn" style="color:var(--navy)" aria-label="Search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+        <button class="icon-btn cart-btn" style="color:var(--navy)" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="cart-count" id="cart-count">0</span></button>
+      </div>
+    </div>
+    <div class="navbar__border"></div>
+  </header>
+
+  <div class="breadcrumb">
+    <a href="../index.html">Home</a>
+    <span>/</span>
+    <a href="../women/" id="breadcrumb-cat">Women</a>
+    <span>/</span>
+    <span id="breadcrumb-name">Dark Blue Skinny Jeans</span>
+  </div>
+
+  <main class="product-page">
+    <div class="product-gallery">
+      <div class="product-gallery__main" id="main-image"></div>
+      <div class="product-gallery__thumbs" id="thumbs">
+        <button class="thumb active" data-bg="linear-gradient(160deg,#1e2a52,#2d3f7e)"></button>
+        <button class="thumb" data-bg="linear-gradient(160deg,#2a3a6e,#3a5a9e)"></button>
+        <button class="thumb" data-bg="linear-gradient(160deg,#1a2a5e,#2d4080)"></button>
+      </div>
+    </div>
+
+    <div class="product-detail">
+      <p class="section-eyebrow" id="product-tag">Women · New Arrival</p>
+      <h1 class="product-detail__name" id="product-name">Dark Blue Skinny Jeans</h1>
+      <p class="product-detail__price" id="product-price">€79,00</p>
+
+      <div class="product-detail__rating">
+        <span class="stars">★★★★★</span>
+        <span class="rating-count">48 reviews</span>
+      </div>
+
+      <p class="product-detail__desc">A wardrobe essential reborn. The Dark Blue Skinny is cut from premium selvedge denim, pre-washed for an authentic fade and softened finish. Engineered to flatter, built to last.</p>
+
+      <div class="product-option">
+        <p class="product-option__label">Size <a href="#" class="product-option__guide">Size Guide</a></p>
+        <div class="size-grid" id="size-grid">
+          <button class="size-btn">XS</button>
+          <button class="size-btn">S</button>
+          <button class="size-btn active">M</button>
+          <button class="size-btn">L</button>
+          <button class="size-btn">XL</button>
+          <button class="size-btn">XXL</button>
+        </div>
+      </div>
+
+      <div class="product-option">
+        <p class="product-option__label">Waist</p>
+        <div class="size-grid">
+          <button class="size-btn">28</button>
+          <button class="size-btn">30</button>
+          <button class="size-btn active">32</button>
+          <button class="size-btn">34</button>
+          <button class="size-btn">36</button>
+        </div>
+      </div>
+
+      <div class="product-actions">
+        <button class="btn btn--gold product-actions__cart" id="add-to-cart">Add to Cart</button>
+        <button class="btn btn--outline-navy" onclick="window.location.href='../custom-design/'">✎ Customise</button>
+        <button class="product-actions__wish" aria-label="Wishlist">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </button>
+      </div>
+
+      <div class="product-meta">
+        <div class="meta-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>Free shipping to Germany · Returns within 30 days</span>
+        </div>
+        <div class="meta-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Premium selvedge denim · Made in Germany</span>
+        </div>
+      </div>
+
+      <details class="product-accordion">
+        <summary>Fabric &amp; Care</summary>
+        <p>98% cotton, 2% elastane. Machine wash at 30°C. Do not tumble dry. Iron on low heat. Wash inside out to preserve colour.</p>
+      </details>
+      <details class="product-accordion">
+        <summary>Shipping &amp; Returns</summary>
+        <p>Free standard shipping to Germany (3–5 days). International shipping available. Free returns within 30 days of delivery.</p>
+      </details>
+      <details class="product-accordion">
+        <summary>Sizing</summary>
+        <p>This style runs true to size. If you’re between sizes, we recommend sizing up. For a perfect fit, try our <a href="../custom-design/">Custom Design</a> service.</p>
+      </details>
+    </div>
+  </main>
+
+  <section class="related">
+    <div class="related__inner">
+      <p class="section-eyebrow">You May Also Like</p>
+      <h2 class="section-title">Related Products</h2>
+      <div class="related__grid">
+        <article class="product-card" onclick="window.location.href='../product/?id=w2'">
+          <div class="product-card__image-wrap"><div class="product-card__image" style="background:linear-gradient(160deg,#3a5a8c,#5a8abf)"></div><button class="product-card__quick-add">Add to Cart</button></div>
+          <div class="product-card__info"><h3 class="product-card__name">Light Blue Jeans</h3><p class="product-card__price">€79,00</p></div>
+        </article>
+        <article class="product-card" onclick="window.location.href='../product/?id=w3'">
+          <div class="product-card__image-wrap"><div class="product-card__image" style="background:linear-gradient(160deg,#2c4a7e,#4a7abf)"></div><button class="product-card__quick-add">Add to Cart</button></div>
+          <div class="product-card__info"><h3 class="product-card__name">Wide Leg Indigo</h3><p class="product-card__price">€89,00</p></div>
+        </article>
+        <article class="product-card" onclick="window.location.href='../product/?id=w4'">
+          <div class="product-card__image-wrap"><div class="product-card__image" style="background:linear-gradient(160deg,#1a1a2e,#3a3a5e)"></div><button class="product-card__quick-add">Add to Cart</button></div>
+          <div class="product-card__info"><h3 class="product-card__name">Midnight Straight Cut</h3><p class="product-card__price">€79,00</p></div>
+        </article>
+        <article class="product-card" onclick="window.location.href='../custom-design/'">
+          <div class="product-card__image-wrap"><div class="product-card__image" style="background:var(--navy)"></div><div class="custom-card-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(26,26,46,.85);gap:8px;padding:16px;text-align:center"><p style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)">Made for You</p><p style="font-family:var(--font-display);font-size:18px;color:#fff">Custom Jeans</p><span style="font-size:12px;color:rgba(255,255,255,.6)">from €99</span></div></div>
+          <div class="product-card__info"><h3 class="product-card__name">Design Your Own</h3><p class="product-card__price">from €99</p></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <script src="product.js"></script>
+</body>
+</html>
