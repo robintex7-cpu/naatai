@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Your Own Man Jeans &ndash; NAATAI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../custom-design/configurator.css">
+</head>
+<body>
+
+  <div class="cookie-notice" id="cookieNotice">
+    <p>Like most websites Naatai uses cookies. They help us remember and store information about how you use it. By continuing to use this website you are agreeing to our use of cookies.</p>
+    <button class="cookie-btn" onclick="acceptCookie()">Got it</button>
+  </div>
+
+  <header class="navbar scrolled" id="navbar">
+    <div class="nav-container">
+      <nav class="nav-left">
+        <div class="nav-item has-dropdown">
+          <a href="#" class="nav-link">Man</a>
+          <div class="dropdown">
+            <a href="/naatai/man-custom-design/" class="dropdown-item">Design Own</a>
+            <a href="/naatai/man-collection/" class="dropdown-item">Collection</a>
+          </div>
+        </div>
+        <div class="nav-item has-dropdown">
+          <a href="#" class="nav-link">Woman</a>
+          <div class="dropdown">
+            <a href="/naatai/custom-design/" class="dropdown-item">Design Own</a>
+            <a href="/naatai/woman-collection/" class="dropdown-item">Woman Collection</a>
+          </div>
+        </div>
+      </nav>
+      <a href="/naatai/" class="nav-logo">NAATAI</a>
+      <nav class="nav-right">
+        <a href="/naatai/login/" class="nav-link">Login</a>
+        <button class="nav-icon-btn" aria-label="Search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+        <button class="nav-icon-btn" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span class="cart-count">0</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="page-hero" style="padding-bottom:2rem;">
+    <div class="page-hero-content">
+      <h1 class="page-title">Design Your Own Man Jeans</h1>
+      <p class="page-subtitle">Choose every detail &mdash; made exactly to your measurements</p>
+    </div>
+  </div>
+
+  <main class="config-main">
+    <div class="config-wrap">
+
+      <!-- Step bar -->
+      <div class="step-bar">
+        <div class="step-item active" data-step="1"><div class="step-num">1</div><span>Design</span></div>
+        <div class="step-line"></div>
+        <div class="step-item" data-step="2"><div class="step-num">2</div><span>Measurement</span></div>
+        <div class="step-line"></div>
+        <div class="step-item" data-step="3"><div class="step-num">3</div><span>Payment</span></div>
+      </div>
+
+      <!-- STEP 1: Design -->
+      <div class="config-step active" id="step-1">
+        <h2 class="config-step-title">Choose Your Design</h2>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Fabric <span class="req">*</span></h3>
+          <div class="option-cards">
+            <label class="opt-card">
+              <input type="radio" name="fabric" value="naatai-blue" data-price="99" data-label="Naatai Blue">
+              <div class="opt-card-body">
+                <div class="swatch" style="background:linear-gradient(135deg,#2C4B7C,#1A2E55);"></div>
+                <span class="opt-name">Naatai Blue</span>
+                <span class="opt-price">&euro;99</span>
+              </div>
+            </label>
+            <label class="opt-card">
+              <input type="radio" name="fabric" value="naatai-black" data-price="99" data-label="Naatai Black">
+              <div class="opt-card-body">
+                <div class="swatch" style="background:linear-gradient(135deg,#1a1a1a,#333);"></div>
+                <span class="opt-name">Naatai Black</span>
+                <span class="opt-price">&euro;99</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Front Pocket Design</h3>
+          <label class="opt-check">
+            <input type="checkbox" name="front-pocket" data-price="10" data-label="Front Pocket Design">
+            <span class="check-box"></span>
+            <span class="opt-name">Front Pocket Design</span>
+            <span class="opt-price">+&euro;10</span>
+          </label>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Coin Pocket</h3>
+          <div class="option-cards">
+            <label class="opt-card">
+              <input type="radio" name="coin-pocket" value="man-casual" data-price="0" data-label="Man Casual Jeans 1" checked>
+              <div class="opt-card-body">
+                <span class="opt-name">Man Casual Jeans 1</span>
+                <span class="opt-price">Included</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Front Design</h3>
+          <div class="opt-list">
+            <label class="opt-row"><input type="radio" name="front-design" value="front-design" data-price="270" data-label="Front Design"><span class="opt-name">Front Design</span><span class="opt-price">+&euro;270</span></label>
+            <label class="opt-row"><input type="radio" name="front-design" value="whisker-3d" data-price="13" data-label="Whisker Man Jeans with 3D"><span class="opt-name">Whisker Man Jeans with 3D</span><span class="opt-price">+&euro;13</span></label>
+            <label class="opt-row"><input type="radio" name="front-design" value="whisker-3d-deep" data-price="9" data-label="Whisker with 3D Deep"><span class="opt-name">Whisker with 3D Deep</span><span class="opt-price">+&euro;9</span></label>
+            <label class="opt-row"><input type="radio" name="front-design" value="whisker-destroy" data-price="9" data-label="Whisker with Destroy"><span class="opt-name">Whisker with Destroy</span><span class="opt-price">+&euro;9</span></label>
+            <label class="opt-row"><input type="radio" name="front-design" value="whisker-1-destroy" data-price="7" data-label="Whisker with 1 Destroy"><span class="opt-name">Whisker with 1 Destroy</span><span class="opt-price">+&euro;7</span></label>
+            <label class="opt-row"><input type="radio" name="front-design" value="none" data-price="0" data-label="None" checked><span class="opt-name">None</span><span class="opt-price">&euro;0</span></label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Back Pocket</h3>
+          <div class="opt-list">
+            <label class="opt-row"><input type="radio" name="back-pocket" value="back-pocket" data-price="29" data-label="Back Pocket"><span class="opt-name">Back Pocket</span><span class="opt-price">+&euro;29</span></label>
+            <label class="opt-row"><input type="radio" name="back-pocket" value="simple-pocket" data-price="3" data-label="Simple Pocket"><span class="opt-name">Simple Pocket</span><span class="opt-price">+&euro;3</span></label>
+            <label class="opt-row"><input type="radio" name="back-pocket" value="none" data-price="0" data-label="None" checked><span class="opt-name">None</span><span class="opt-price">&euro;0</span></label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Back Design</h3>
+          <div class="opt-list">
+            <label class="opt-row"><input type="radio" name="back-design" value="back-design" data-price="54" data-label="Back Design"><span class="opt-name">Back Design</span><span class="opt-price">+&euro;54</span></label>
+            <label class="opt-row"><input type="radio" name="back-design" value="whisker-3d-knee" data-price="9" data-label="Whisker with 3D in Knee"><span class="opt-name">Whisker with 3D in Knee</span><span class="opt-price">+&euro;9</span></label>
+            <label class="opt-row"><input type="radio" name="back-design" value="pocket-whisker" data-price="5" data-label="Pocket Whisker Jeans"><span class="opt-name">Pocket Whisker Jeans</span><span class="opt-price">+&euro;5</span></label>
+            <label class="opt-row"><input type="radio" name="back-design" value="3d-knee" data-price="5" data-label="3D on Knee"><span class="opt-name">3D on Knee</span><span class="opt-price">+&euro;5</span></label>
+            <label class="opt-row"><input type="radio" name="back-design" value="3d-destroy" data-price="12" data-label="3D Effect with Destroy"><span class="opt-name">3D Effect with Destroy</span><span class="opt-price">+&euro;12</span></label>
+            <label class="opt-row"><input type="radio" name="back-design" value="none" data-price="0" data-label="None" checked><span class="opt-name">None</span><span class="opt-price">&euro;0</span></label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <h3 class="config-group-title">Fly <span class="req">*</span></h3>
+          <div class="option-cards">
+            <label class="opt-card"><input type="radio" name="fly" value="button" data-price="0" data-label="Button"><div class="opt-card-body"><span class="opt-name">Button</span></div></label>
+            <label class="opt-card"><input type="radio" name="fly" value="zipper" data-price="0" data-label="Zipper"><div class="opt-card-body"><span class="opt-name">Zipper</span></div></label>
+          </div>
+        </div>
+
+        <div class="config-footer">
+          <div class="config-footer-left">
+            <button class="btn-undo" onclick="undoLast()">&#8630; Undo</button>
+            <button class="btn-video" onclick="viewVideo()">&#9654; View Video</button>
+          </div>
+          <div class="config-footer-right">
+            <div class="price-tag">Total: <strong id="totalPrice">&euro;99</strong></div>
+            <button class="btn btn-primary" onclick="goToStep(2)">Next: Measurement &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Measurement -->
+      <div class="config-step" id="step-2">
+        <h2 class="config-step-title">Your Measurements</h2>
+        <div class="unit-toggle">
+          <button class="unit-btn active" id="btnCm" onclick="setUnit('cm')">Cm</button>
+          <button class="unit-btn" id="btnInch" onclick="setUnit('inch')">Inch</button>
+        </div>
+        <div class="measure-grid">
+          <div class="mfield"><label>Waist <span class="req">*</span></label><div class="minput"><input type="number" name="waist" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Hip <span class="req">*</span></label><div class="minput"><input type="number" name="hip" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Crotch <span class="req">*</span></label><div class="minput"><input type="number" name="crotch" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Thigh <span class="req">*</span></label><div class="minput"><input type="number" name="thigh" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Knee <span class="req">*</span></label><div class="minput"><input type="number" name="knee" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Knee Distance <span class="req">*</span></label><div class="minput"><input type="number" name="knee-distance" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Calf <span class="req">*</span></label><div class="minput"><input type="number" name="calf" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Ankle <span class="req">*</span></label><div class="minput"><input type="number" name="ankle" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Calf Distance <span class="req">*</span></label><div class="minput"><input type="number" name="calf-distance" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Length <span class="req">*</span></label><div class="minput"><input type="number" name="length" placeholder="0" min="0" required><span class="unit-lbl">cm</span></div></div>
+          <div class="mfield"><label>Height <span class="req">*</span></label><div class="minput"><input type="number" name="height" placeholder="0" min="0" required><span class="unit-lbl" id="heightUnit">feet/cm</span></div></div>
+          <div class="mfield"><label>Weight <span class="req">*</span></label><div class="minput"><input type="number" name="weight" placeholder="0" min="0" required><span class="unit-lbl">lbs</span></div></div>
+        </div>
+        <div class="config-footer">
+          <button class="btn btn-outline-dark" onclick="goToStep(1)">&larr; Back</button>
+          <button class="btn btn-primary" onclick="goToStep(3)">Next: Payment &rarr;</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Payment -->
+      <div class="config-step" id="step-3">
+        <h2 class="config-step-title">Complete Your Order</h2>
+        <div class="payment-layout">
+          <div class="payment-col-left">
+            <div class="auth-tabs">
+              <button class="auth-tab active" onclick="switchTab('login')">Login</button>
+              <button class="auth-tab" onclick="switchTab('register')">Register</button>
+            </div>
+            <div class="auth-panel active" id="tab-login">
+              <div class="fgroup"><label>Email <span class="req">*</span></label><input type="email" placeholder="your@email.com"></div>
+              <div class="fgroup"><label>Password <span class="req">*</span></label><input type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"></div>
+              <button class="btn btn-primary btn-full">Login</button>
+            </div>
+            <div class="auth-panel" id="tab-register">
+              <div class="frow">
+                <div class="fgroup"><label>First Name <span class="req">*</span></label><input type="text" placeholder="First name"></div>
+                <div class="fgroup"><label>Last Name <span class="req">*</span></label><input type="text" placeholder="Last name"></div>
+              </div>
+              <div class="fgroup"><label>Email <span class="req">*</span></label><input type="email" placeholder="your@email.com"></div>
+              <div class="fgroup"><label>Password <span class="req">*</span></label><input type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"></div>
+              <div class="fgroup fcheck"><label class="check-label"><input type="checkbox" required><span>I agree to the <a href="/naatai/terms/">Terms &amp; Conditions</a></span></label></div>
+              <button class="btn btn-primary btn-full">Register</button>
+            </div>
+            <div class="fsection">
+              <h3 class="fsection-title">Delivery Address</h3>
+              <div class="fgroup"><label>Address Line <span class="req">*</span></label><input type="text" placeholder="Street and number"></div>
+              <div class="fgroup"><label>Additional Info</label><input type="text" placeholder="Apartment, suite, etc. (optional)"></div>
+              <div class="frow">
+                <div class="fgroup"><label>Postcode <span class="req">*</span></label><input type="text" placeholder="Postcode"></div>
+                <div class="fgroup"><label>Town / City <span class="req">*</span></label><input type="text" placeholder="City"></div>
+              </div>
+              <div class="fgroup"><label>Country <span class="req">*</span></label><select><option value="">Select country...</option><option>Germany</option><option>Austria</option><option>Switzerland</option><option>United Kingdom</option><option>France</option><option>Netherlands</option><option>Belgium</option><option>United States</option></select></div>
+              <div class="fgroup fcheck"><label class="check-label"><input type="checkbox"><span>Billing address same as delivery</span></label></div>
+            </div>
+            <div class="fsection">
+              <h3 class="fsection-title">Payment Method</h3>
+              <div class="pay-methods">
+                <label class="pay-opt"><input type="radio" name="payment" value="mastercard"><span>Mastercard</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="visa"><span>Visa</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="amex"><span>American Express</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="paypal"><span>PayPal</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="invoice"><span>Invoice</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="sepa"><span>SEPA</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="diners"><span>Diners Club</span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="discover"><span>Discover</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="payment-col-right">
+            <div class="order-summary">
+              <h3 class="order-summary-title">Order Review</h3>
+              <div class="order-row"><span>Fabric</span><span id="sum-fabric">&mdash;</span></div>
+              <div class="order-row"><span>Front Pocket</span><span id="sum-front-pocket">&mdash;</span></div>
+              <div class="order-row"><span>Front Paint</span><span id="sum-front-design">&mdash;</span></div>
+              <div class="order-row"><span>Back Pocket</span><span id="sum-back-pocket">&mdash;</span></div>
+              <div class="order-row order-subtotal"><span>Subtotal</span><span id="sum-subtotal">&euro;99</span></div>
+              <div class="order-row"><span>Discount</span><span id="sum-discount">&mdash;</span></div>
+              <div class="order-row order-total"><span>Order Total</span><span id="sum-total">&euro;99</span></div>
+              <button class="btn btn-outline-dark btn-full" style="margin-top:1rem;" onclick="downloadInvoice()">Download Invoice</button>
+              <button class="btn btn-primary btn-full" style="margin-top:0.75rem;" onclick="placeOrder()">Pay</button>
+            </div>
+          </div>
+        </div>
+        <div class="config-footer" style="margin-top:2rem;">
+          <button class="btn btn-outline-dark" onclick="goToStep(2)">&larr; Back</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col"><div class="footer-logo">NAATAI</div><p class="footer-tagline">Premium Custom Denim</p></div>
+        <div class="footer-col"><h4 class="footer-heading">Shop</h4><ul class="footer-links"><li><a href="/naatai/man-collection/">Man Collection</a></li><li><a href="/naatai/woman-collection/">Woman Collection</a></li></ul></div>
+        <div class="footer-col"><h4 class="footer-heading">Legal</h4><ul class="footer-links"><li><a href="/naatai/legal-notice/">Legal Notice</a></li><li><a href="/naatai/terms/">Terms &amp; Conditions</a></li><li><a href="/naatai/cancellation/">Cancellation Policy</a></li></ul></div>
+        <div class="footer-col"><h4 class="footer-heading">Contact</h4><address class="footer-address"><p>Naatai UG (limited liability)</p><p>Hubertusstr. 149, 41239 Monchengladbach, Germany</p><p class="mt-8"><a href="tel:+491631005527">+49 163 1005527</a></p><p><a href="mailto:contact@naatai.de">contact@naatai.de</a></p></address></div>
+      </div>
+      <div class="footer-bottom"><p>&copy; 2020 NAATAI. All rights reserved. | Managing director: Rafikuzzaman</p></div>
+    </div>
+  </footer>
+
+  <script src="../js/main.js"></script>
+  <script src="../custom-design/configurator.js"></script>
+</body>
+</html>
