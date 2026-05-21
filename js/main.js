@@ -1,10 +1,41 @@
+// Navbar scroll effect
 const navbar = document.getElementById('navbar');
-const setNavbarState = () => { navbar.classList.toggle('scrolled', window.scrollY > 20); };
-window.addEventListener('scroll', setNavbarState, { passive: true });
-setNavbarState();
-document.querySelector('.hero__scroll')?.addEventListener('click', () => { document.getElementById('new-arrivals')?.scrollIntoView({ behavior: 'smooth' }); });
-const cartCount = document.querySelector('.cart-count');
-let count = 0;
-document.querySelectorAll('.product-card__quick-add').forEach(btn => { btn.addEventListener('click', () => { count++; cartCount.textContent = count; cartCount.style.transform = 'scale(1.4)'; setTimeout(() => { cartCount.style.transform = 'scale(1)'; }, 200); }); });
-const observer = new IntersectionObserver((entries) => { entries.forEach(entry => { if (entry.isIntersecting) { entry.target.style.opacity = '1'; entry.target.style.transform = 'translateY(0)'; observer.unobserve(entry.target); } }); }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-['.arrivals__header', '.product-card', '.feature-banner__content', '.statement__inner', '.newsletter__inner'].forEach(selector => { document.querySelectorAll(selector).forEach((el, i) => { el.style.cssText += `opacity:0;transform:translateY(28px);transition:opacity 0.6s ease ${i*.1}s,transform 0.6s cubic-bezier(0.22,1,0.36,1) ${i*.1}s;`; observer.observe(el); }); });
+if (navbar) {
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+  // Trigger once on load
+  navbar.classList.toggle('scrolled', window.scrollY > 40);
+}
+
+// Cookie notice
+function acceptCookie() {
+  const notice = document.getElementById('cookieNotice');
+  if (notice) notice.style.display = 'none';
+  try { localStorage.setItem('naatai_cookie', '1'); } catch(e) {}
+}
+try {
+  if (localStorage.getItem('naatai_cookie') === '1') {
+    const notice = document.getElementById('cookieNotice');
+    if (notice) notice.style.display = 'none';
+  }
+} catch(e) {}
+
+// Search toggle placeholder
+function toggleSearch() {
+  alert('Search coming soon.');
+}
+
+// Scroll reveal
+const reveals = document.querySelectorAll('.reveal');
+if (reveals.length) {
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), i * 90);
+        revealObs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  reveals.forEach(el => revealObs.observe(el));
+}

@@ -1,214 +1,239 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NAATAI – The Look</title>
-  <meta name="description" content="Premium denim, made in Germany. Discover the latest collections from Naatai – The Look." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAATAI – Premium Custom Denim</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
+  <!-- Cookie Notice -->
+  <div class="cookie-notice" id="cookieNotice">
+    <p>Like most websites Naatai uses cookies. They help us remember and store information about how you use it. By continuing to use this website you are agreeing to our use of cookies.</p>
+    <button class="cookie-btn" onclick="acceptCookie()">Got it</button>
+  </div>
+
+  <!-- Navbar -->
   <header class="navbar" id="navbar">
-    <div class="navbar__inner">
-      <nav class="navbar__left">
-        <a href="women/" class="nav-link">WOMEN</a>
-        <a href="men/" class="nav-link">MEN</a>
-        <a href="lookbook/" class="nav-link">LOOKBOOK</a>
-        <a href="custom-design/" class="nav-link nav-link--highlight">CUSTOM DESIGN</a>
+    <div class="nav-container">
+      <nav class="nav-left">
+        <div class="nav-item has-dropdown">
+          <a href="#" class="nav-link">Man</a>
+          <div class="dropdown">
+            <a href="/naatai/man-custom-design/" class="dropdown-item">Design Own</a>
+            <a href="/naatai/man-collection/" class="dropdown-item">Collection</a>
+          </div>
+        </div>
+        <div class="nav-item has-dropdown">
+          <a href="#" class="nav-link">Woman</a>
+          <div class="dropdown">
+            <a href="/naatai/custom-design/" class="dropdown-item">Design Own</a>
+            <a href="/naatai/woman-collection/" class="dropdown-item">Woman Collection</a>
+          </div>
+        </div>
       </nav>
-      <a href="/naatai/" class="navbar__logo">NAATAI</a>
-      <div class="navbar__right">
-        <button class="icon-btn" aria-label="Search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
-        <button class="icon-btn" aria-label="Account"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
-        <button class="icon-btn cart-btn" aria-label="Cart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="cart-count">0</span></button>
-      </div>
+
+      <a href="/naatai/" class="nav-logo">NAATAI</a>
+
+      <nav class="nav-right">
+        <a href="/naatai/login/" class="nav-link">Login</a>
+        <button class="nav-icon-btn" aria-label="Search" onclick="toggleSearch()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </button>
+        <button class="nav-icon-btn" aria-label="Cart">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          <span class="cart-count">0</span>
+        </button>
+      </nav>
     </div>
-    <div class="navbar__border"></div>
   </header>
 
+  <!-- Hero -->
   <section class="hero">
-    <div class="hero__bg"><div class="hero__overlay"></div><div class="hero__pattern"></div></div>
-    <div class="hero__content">
-      <p class="hero__eyebrow">SS 2026 Collection</p>
-      <h1 class="hero__headline">Crafted<br /><em>for the Bold.</em></h1>
-      <p class="hero__sub">Premium denim, made in Germany.</p>
-      <div class="hero__ctas">
-        <a href="#new-arrivals" class="btn btn--gold">Shop Now</a>
-        <a href="custom-design/" class="btn btn--outline-white">Design Yours</a>
-      </div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <span class="hero-eyebrow">NEW NOW</span>
+      <h1 class="hero-title">Bow cotton dress</h1>
+      <a href="/naatai/woman-collection/" class="btn btn-primary">Shop Now</a>
     </div>
-    <div class="hero__scroll"><span>Scroll</span><div class="hero__scroll-line"></div></div>
   </section>
 
+  <!-- Categories -->
   <section class="categories">
-    <a href="women/" class="category-tile">
-      <div class="category-tile__bg category-tile__bg--women"><div class="category-tile__overlay"></div></div>
-      <div class="category-tile__content">
-        <h2 class="category-tile__label">Women</h2>
-        <span class="category-tile__arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
+    <div class="container">
+      <div class="categories-grid">
+        <a href="/naatai/woman-collection/" class="category-card">
+          <div class="category-bg category-woman"></div>
+          <div class="category-label">
+            <span class="category-eyebrow">New Collection</span>
+            <h3 class="category-name">Woman</h3>
+            <span class="category-cta">Shop Now &rarr;</span>
+          </div>
+        </a>
+        <a href="/naatai/man-collection/" class="category-card">
+          <div class="category-bg category-man"></div>
+          <div class="category-label">
+            <span class="category-eyebrow">New Collection</span>
+            <h3 class="category-name">Man</h3>
+            <span class="category-cta">Shop Now &rarr;</span>
+          </div>
+        </a>
       </div>
-    </a>
-    <a href="men/" class="category-tile">
-      <div class="category-tile__bg category-tile__bg--men"><div class="category-tile__overlay"></div></div>
-      <div class="category-tile__content">
-        <h2 class="category-tile__label">Men</h2>
-        <span class="category-tile__arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
-      </div>
-    </a>
-  </section>
-
-  <section class="arrivals" id="new-arrivals">
-    <div class="arrivals__header">
-      <p class="section-eyebrow">Just Dropped</p>
-      <h2 class="section-title">New Arrivals</h2>
-      <a href="women/" class="section-link">View All →</a>
-    </div>
-    <div class="arrivals__grid">
-      <article class="product-card" onclick="location.href='product/?id=w1'" style="cursor:pointer">
-        <div class="product-card__image-wrap">
-          <div class="product-card__image product-card__image--1"></div>
-          <span class="product-card__badge">New</span>
-          <button class="product-card__quick-add">Add to Cart</button>
-        </div>
-        <div class="product-card__info"><h3 class="product-card__name">Women Dark Blue Skinny Jeans</h3><p class="product-card__price">€79,00</p></div>
-      </article>
-      <article class="product-card" onclick="location.href='product/?id=w2'" style="cursor:pointer">
-        <div class="product-card__image-wrap">
-          <div class="product-card__image product-card__image--2"></div>
-          <span class="product-card__badge">New</span>
-          <button class="product-card__quick-add">Add to Cart</button>
-        </div>
-        <div class="product-card__info"><h3 class="product-card__name">Naatai Light Blue Jeans</h3><p class="product-card__price">€79,00</p></div>
-      </article>
-      <article class="product-card" onclick="location.href='product/?id=m1'" style="cursor:pointer">
-        <div class="product-card__image-wrap">
-          <div class="product-card__image product-card__image--3"></div>
-          <span class="product-card__badge">New</span>
-          <button class="product-card__quick-add">Add to Cart</button>
-        </div>
-        <div class="product-card__info"><h3 class="product-card__name">Sunny Jeans</h3><p class="product-card__price">€79,00</p></div>
-      </article>
-      <article class="product-card" onclick="location.href='product/?id=m2'" style="cursor:pointer">
-        <div class="product-card__image-wrap">
-          <div class="product-card__image product-card__image--4"></div>
-          <span class="product-card__badge">New</span>
-          <button class="product-card__quick-add">Add to Cart</button>
-        </div>
-        <div class="product-card__info"><h3 class="product-card__name">Naatai Royal Blue Jeans</h3><p class="product-card__price">€79,00</p></div>
-      </article>
     </div>
   </section>
 
+  <!-- New Arrivals -->
+  <section class="new-arrivals">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">New Arrivals</h2>
+        <div class="section-rule"></div>
+      </div>
+      <div class="products-grid">
+        <article class="product-card reveal">
+          <a href="/naatai/product/?id=women-dark-blue">
+            <div class="product-img-wrap">
+              <div class="product-img pimg-1"></div>
+              <span class="badge badge-new">New</span>
+            </div>
+            <div class="product-meta">
+              <h4 class="product-name">Women Dark blue skinny jeans</h4>
+              <span class="product-price">&euro;79</span>
+            </div>
+          </a>
+        </article>
+        <article class="product-card reveal">
+          <a href="/naatai/product/?id=naatai-light-blue">
+            <div class="product-img-wrap">
+              <div class="product-img pimg-2"></div>
+              <span class="badge badge-new">New</span>
+            </div>
+            <div class="product-meta">
+              <h4 class="product-name">Naatai Light blue jeans</h4>
+              <span class="product-price">&euro;79</span>
+            </div>
+          </a>
+        </article>
+        <article class="product-card reveal">
+          <a href="/naatai/product/?id=sunny">
+            <div class="product-img-wrap">
+              <div class="product-img pimg-3"></div>
+            </div>
+            <div class="product-meta">
+              <h4 class="product-name">Sunny</h4>
+              <span class="product-price">&euro;79</span>
+            </div>
+          </a>
+        </article>
+        <article class="product-card reveal">
+          <a href="/naatai/product/?id=naatai-royal-blue">
+            <div class="product-img-wrap">
+              <div class="product-img pimg-4"></div>
+            </div>
+            <div class="product-meta">
+              <h4 class="product-name">Naatai royal Blue</h4>
+              <span class="product-price">&euro;79</span>
+            </div>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Custom Design Promo -->
   <section class="custom-promo">
-    <div class="custom-promo__inner">
-      <div class="custom-promo__text">
-        <p class="section-eyebrow">Made for You</p>
-        <h2 class="custom-promo__title">Your Jeans.<br /><em>Your Rules.</em></h2>
-        <p class="custom-promo__desc">Choose your fabric, add your finishing details, enter your exact measurements — and we’ll craft a pair that fits only you. Starting from €99.</p>
-        <ul class="custom-promo__features">
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Choose fabric, pocket &amp; fly style</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Add whisker &amp; destroy effects</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>12-point body measurement guide</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Ships in 3–5 weeks · Free to Germany</li>
-        </ul>
-        <a href="custom-design/" class="btn btn--gold">Start Designing →</a>
-      </div>
-      <div class="custom-promo__visual">
-        <div class="custom-promo__card">
-          <div class="custom-promo__swatch custom-promo__swatch--blue"></div>
-          <div class="custom-promo__swatch custom-promo__swatch--black"></div>
-        </div>
-        <div class="custom-promo__steps">
-          <div class="mini-step"><span>01</span> Design</div>
-          <div class="mini-step"><span>02</span> Measure</div>
-          <div class="mini-step"><span>03</span> Order</div>
+    <div class="container">
+      <div class="custom-promo-inner">
+        <span class="promo-eyebrow">Bespoke</span>
+        <h2 class="promo-title">Design Your Own Jeans</h2>
+        <p class="promo-text">Create a pair that is uniquely yours. Choose your fabric, details and measurements for a perfect custom fit.</p>
+        <div class="promo-actions">
+          <a href="/naatai/custom-design/" class="btn btn-primary">Design for Woman</a>
+          <a href="/naatai/man-custom-design/" class="btn btn-outline-light">Design for Man</a>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="feature-banner">
-    <div class="feature-banner__image"><div class="feature-banner__overlay"></div></div>
-    <div class="feature-banner__content">
-      <p class="section-eyebrow" style="color:var(--gold)">New Now</p>
-      <h2 class="feature-banner__title">Bow Cotton<br />Dress</h2>
-      <p class="feature-banner__desc">Effortlessly feminine. The season’s essential piece.</p>
-      <a href="women/" class="btn btn--outline-white">Shop Now</a>
+  <!-- Brand Statement -->
+  <section class="brand-statement">
+    <div class="container">
+      <blockquote class="statement-quote">&ldquo;Wear what you design. Own what you wear.&rdquo;</blockquote>
+      <p class="statement-sub">Premium custom denim, made to your exact measurements.</p>
     </div>
   </section>
 
-  <section class="statement">
-    <div class="statement__inner">
-      <p class="statement__quote">“The Look<br /><em>is Everything.”</em></p>
-      <div class="statement__line"></div>
-      <p class="statement__sub">Since 2010 — Mönchengladbach, Germany</p>
-    </div>
-  </section>
-
+  <!-- Newsletter -->
   <section class="newsletter">
-    <div class="newsletter__inner">
-      <h2 class="newsletter__title">Stay in the Loop</h2>
-      <p class="newsletter__desc">New drops, exclusive offers, and editorial stories — straight to your inbox.</p>
-      <form class="newsletter__form" onsubmit="return false;">
-        <input type="email" placeholder="Your email address" class="newsletter__input" />
-        <button type="submit" class="btn btn--gold">Subscribe</button>
+    <div class="container">
+      <h2 class="newsletter-title">Stay in the Loop</h2>
+      <p class="newsletter-sub">New arrivals, exclusive offers and styling tips &mdash; straight to your inbox.</p>
+      <form class="newsletter-form" onsubmit="return false;">
+        <input type="email" class="newsletter-input" placeholder="Your email address" required>
+        <button type="submit" class="btn btn-primary">Subscribe</button>
       </form>
     </div>
   </section>
 
+  <!-- Footer -->
   <footer class="footer">
-    <div class="footer__top">
-      <div class="footer__col footer__col--brand">
-        <p class="footer__logo">NAATAI</p>
-        <p class="footer__tagline">Premium denim, made<br />in Germany since 2010.</p>
-        <div class="footer__socials">
-          <a href="#" class="social-link" aria-label="Facebook"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
-          <a href="#" class="social-link" aria-label="Twitter"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg></a>
-          <a href="#" class="social-link" aria-label="Pinterest"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12c0 4.2 2.6 7.8 6.3 9.3-.1-.8-.1-2.1.2-3l1.3-5.5s-.3-.7-.3-1.7c0-1.6.9-2.8 2.3-2.8 1.1 0 1.6.8 1.6 1.8 0 1.1-.7 2.7-1 4.2-.3 1.3.6 2.3 1.9 2.3 2.3 0 3.9-2.9 3.9-6.4 0-2.6-1.8-4.5-4.5-4.5-3.1 0-4.9 2.3-4.9 4.7 0 .9.4 1.9.8 2.4.1.1.1.2.1.3l-.3 1.3c-.1.2-.2.3-.4.2-1.6-.7-2.6-3-2.6-4.8 0-3.9 2.8-7.5 8.2-7.5 4.3 0 7.6 3 7.6 7.1 0 4.2-2.7 7.6-6.4 7.6-1.3 0-2.5-.7-2.9-1.4l-.8 2.9c-.3 1-.9 2.1-1.4 2.9.9.3 1.9.5 2.9.5 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg></a>
-          <a href="#" class="social-link" aria-label="LinkedIn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <div class="footer-logo">NAATAI</div>
+          <p class="footer-tagline">Premium Custom Denim</p>
+          <div class="footer-socials">
+            <a href="#" class="social-link" aria-label="Facebook">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+            </a>
+            <a href="#" class="social-link" aria-label="Twitter">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+            </a>
+            <a href="#" class="social-link" aria-label="Pinterest">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.24 2.65 7.86 6.39 9.29-.09-.78-.17-1.98.04-2.83.18-.77 1.22-5.17 1.22-5.17s-.31-.63-.31-1.56c0-1.46.85-2.55 1.9-2.55.9 0 1.33.67 1.33 1.48 0 .9-.58 2.26-.87 3.51-.25 1.05.52 1.9 1.54 1.9 1.85 0 3.27-1.95 3.27-4.77 0-2.49-1.79-4.23-4.35-4.23-2.96 0-4.7 2.22-4.7 4.51 0 .89.34 1.85.77 2.37.08.1.09.19.07.29l-.28 1.14c-.04.18-.14.22-.32.13-1.25-.58-2.03-2.42-2.03-3.89 0-3.16 2.3-6.07 6.63-6.07 3.48 0 6.19 2.48 6.19 5.8 0 3.46-2.18 6.24-5.2 6.24-1.02 0-1.97-.53-2.3-1.15l-.62 2.33c-.23.87-.84 1.96-1.25 2.62.94.29 1.94.45 2.97.45 5.52 0 10-4.48 10-10S17.52 2 12 2z"/></svg>
+            </a>
+            <a href="#" class="social-link" aria-label="LinkedIn">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+            </a>
+            <a href="#" class="social-link" aria-label="Behance">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M7.5 11.5c.8 0 1.4-.6 1.4-1.3S8.3 9 7.5 9H5v2.5h2.5zm.3 2.5H5V17h2.8c.9 0 1.5-.6 1.5-1.5s-.6-1.5-1.5-1.5zM22 12.5h-5c.1 1.1.9 1.8 2 1.8.8 0 1.4-.3 1.7-1H22c-.5 1.6-2 2.7-3.9 2.7-2.3 0-4-1.7-4-4s1.7-4 4-4 3.9 1.8 3.9 4v.5zM18.1 10c-1 0-1.8.6-2 1.5h3.9c-.2-.9-1-1.5-1.9-1.5zM15 6h4v1h-4V6zM2 7h6c1.7 0 3 1.1 3 2.7 0 1-.5 1.8-1.4 2.3 1.1.4 1.8 1.4 1.8 2.5C11.4 16.2 10 17.5 8 17.5H2V7z"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Shop</h4>
+          <ul class="footer-links">
+            <li><a href="/naatai/man-collection/">Man Collection</a></li>
+            <li><a href="/naatai/woman-collection/">Woman Collection</a></li>
+            <li><a href="/naatai/custom-design/">Design Own (Woman)</a></li>
+            <li><a href="/naatai/man-custom-design/">Design Own (Man)</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Legal</h4>
+          <ul class="footer-links">
+            <li><a href="/naatai/legal-notice/">Legal Notice</a></li>
+            <li><a href="/naatai/terms/">Terms &amp; Conditions</a></li>
+            <li><a href="/naatai/cancellation/">Cancellation Policy</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Contact</h4>
+          <address class="footer-address">
+            <p>Naatai UG (limited liability)</p>
+            <p>Hubertusstr. 149</p>
+            <p>41239 Monchengladbach</p>
+            <p>Germany</p>
+            <p class="mt-8"><a href="tel:+491631005527">+49 163 1005527</a></p>
+            <p><a href="mailto:contact@naatai.de">contact@naatai.de</a></p>
+          </address>
         </div>
       </div>
-      <div class="footer__col">
-        <p class="footer__col-title">Shop</p>
-        <ul class="footer__links">
-          <li><a href="women/">Women</a></li>
-          <li><a href="men/">Men</a></li>
-          <li><a href="#new-arrivals">New Arrivals</a></li>
-          <li><a href="custom-design/">Custom Design</a></li>
-          <li><a href="lookbook/">Lookbook</a></li>
-        </ul>
-      </div>
-      <div class="footer__col">
-        <p class="footer__col-title">Help</p>
-        <ul class="footer__links">
-          <li><a href="#">Size Guide</a></li>
-          <li><a href="#">Shipping &amp; Returns</a></li>
-          <li><a href="#">FAQ</a></li>
-          <li><a href="#">Care Instructions</a></li>
-        </ul>
-      </div>
-      <div class="footer__col">
-        <p class="footer__col-title">Contact</p>
-        <address class="footer__address">
-          <p>Hubertusstr. 149</p><p>41239 Mönchengladbach</p><p>Germany</p>
-          <p style="margin-top:1rem"><a href="tel:+491631005527">+49 163 1005527</a></p>
-          <p><a href="mailto:contact@naatai.de">contact@naatai.de</a></p>
-        </address>
-      </div>
-    </div>
-    <div class="footer__bottom">
-      <p class="footer__copy">&copy; 2026 Naatai GmbH. All rights reserved.</p>
-      <div class="footer__legal">
-        <a href="#">Legal Notice</a><a href="#">Terms &amp; Conditions</a>
-        <a href="#">Privacy Policy</a><a href="#">Cancellation Policy</a>
-      </div>
-      <div class="footer__payments">
-        <span class="payment-icon">VISA</span><span class="payment-icon">MC</span>
-        <span class="payment-icon">PayPal</span><span class="payment-icon">Apple Pay</span>
+      <div class="footer-bottom">
+        <p>&copy; 2020 NAATAI. All rights reserved. | Managing director: Rafikuzzaman</p>
       </div>
     </div>
   </footer>
