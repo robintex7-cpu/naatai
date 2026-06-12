@@ -1,0 +1,674 @@
+//@version=6
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║   ULTIMATE CRYPTO FUTURES PRO  —  Binance Futures Edition       ║
+// ║   v3.0  |  Pine Script v6                                        ║
+// ║                                                                   ║
+// ║   Combines & UPGRADES:                                           ║
+// ║   ✦ BB Trigger (normalized oscillator)                           ║
+// ║   ✦ Smoothed Heiken Ashi (EMA-smoothed inputs)                   ║
+// ║   ✦ PCTrend (lag-corrected EMA trend)                            ║
+// ║   ✦ Supertrend (ATR-based trend filter)                          ║
+// ║   ✦ ADX (trend strength gate)                                    ║
+// ║   ✦ RSI (extreme-zone avoidance)                                 ║
+// ║   ✦ VWAP (session bias)                                          ║
+// ║   ✦ TTM-style Squeeze detection                                  ║
+// ║   ✦ Higher-TF trend confirmation                                 ║
+// ║   ✦ Market Structure (swing highs/lows)                          ║
+// ║   ✦ 3-tier TP + adaptive trailing stop                           ║
+// ║   ✦ ATR-scaled position sizing                                   ║
+// ║   ✦ Drawdown circuit breaker                                     ║
+// ║   ✦ Score 0-10 weighted signal grading                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+strategy("Ultimate Crypto Futures Pro",
+     shorttitle          = "UCF Pro",
+     overlay             = false,
+     behind_chart        = false,
+     pyramiding          = 0,
+     initial_capital     = 10000,
+     default_qty_type    = strategy.fixed,
+     default_qty_value   = 1,
+     commission_type     = strategy.commission.percent,
+     commission_value    = 0.04,
+     slippage            = 2,
+     process_orders_on_close    = true,
+     fill_orders_on_standard_ohlc = true,
+     max_bars_back       = 500)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 1  ─  BACKTEST WINDOW & TRADE DIRECTION
+// ═══════════════════════════════════════════════════════════════════
+grpBT      = "🗓 Backtest"
+startDate  = input.time(timestamp("2022-01-01"), "Start date",  group=grpBT)
+endDate    = input.time(timestamp("2026-12-31"), "End date",    group=grpBT)
+tradeDir   = input.string("Both", "Direction",
+     options=["Both","Long only","Short only"], group=grpBT)
+riskPct    = input.float(1.0,  "Risk % per trade",
+     minval=0.1, maxval=10.0, step=0.1,  group=grpBT,
+     tooltip="% of equity risked per trade. ATR-based sizing keeps dollar risk constant.")
+maxDDPct   = input.float(20.0, "Max drawdown % (halt trading)",
+     minval=5.0, step=1.0, group=grpBT,
+     tooltip="New entries are blocked when peak-to-trough drawdown exceeds this.")
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 2  ─  DISPLAY TOGGLES
+// ═══════════════════════════════════════════════════════════════════
+grpDisp    = "👁 Display"
+showHA     = input.bool(true,  "Smoothed Heikin Ashi candles", group=grpDisp)
+showTrend  = input.bool(true,  "PCTrend EMA line",             group=grpDisp)
+showST     = input.bool(true,  "Supertrend line",              group=grpDisp)
+showVWAP   = input.bool(true,  "VWAP line",                    group=grpDisp)
+showSignals= input.bool(true,  "Signal labels on chart",       group=grpDisp)
+showDash   = input.bool(true,  "Guidance dashboard",           group=grpDisp)
+autoTune   = input.bool(true,  "Auto-tune parameters to TF",   group=grpDisp)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 3  ─  TIMEFRAME PROFILES
+// ═══════════════════════════════════════════════════════════════════
+tfMins = timeframe.in_seconds() / 60.0
+
+isM1  = tfMins <= 1
+isM5  = tfMins > 1   and tfMins <= 5
+isM15 = tfMins > 5   and tfMins <= 15
+isM30 = tfMins > 15  and tfMins <= 30
+isH1  = tfMins > 30  and tfMins <= 60
+isH4  = tfMins > 60  and tfMins <= 240
+isD1  = tfMins > 240 and tfMins <= 1440
+isW1  = tfMins > 1440
+
+tfName = isM1 ? "M1" : isM5 ? "M5" : isM15 ? "M15" : isM30 ? "M30" :
+         isH1 ? "H1" : isH4 ? "H4" : isD1  ? "D1"  : isW1  ? "W1" : "MN"
+
+// Higher timeframe for MTF confirmation
+htfRes = isM1 or isM5  ? "15"  :
+         isM15 or isM30 ? "60"  :
+         isH1           ? "240" :
+         isH4           ? "D"   :
+         isD1           ? "W"   : "M"
+
+// Auto-tune lookup table
+at_trendLen = isM1 or isM5 ? 14 : isM15 ? 16 : isM30 ? 18 : isH1 ? 21 : isH4 ? 34 : isD1 ? 50 : 30
+at_atrLen   = isM1 or isM5 ? 10 : isM15 or isM30 ? 12 : 14
+at_atrFlt   = isM1 or isM5 ? 0.07 : isM15 ? 0.09 : isM30 ? 0.10 : isH1 ? 0.12 : isH4 ? 0.15 : 0.18
+at_bbPer    = isM1 or isM5 ? 10  : isM15 or isM30 ? 12 : 14
+at_bbSm     = isM1 or isM5 or isM15 or isM30 or isH1 ? 5 : 6
+at_bbTrig   = isM1 or isM5 or isM15 or isM30 or isH1 ? 3 : 4
+at_stopMult = isM1 or isM5 ? 1.5 : isM15 ? 1.7 : isM30 ? 1.8 : isH1 ? 2.0 : isH4 ? 2.2 : 2.5
+at_stFact   = isM1 or isM5 ? 2.5 : isM15 or isM30 ? 2.8 : 3.0
+at_stLen    = isM1 or isM5 ? 7 : isM15 or isM30 ? 10 : 10
+at_haSm     = isM1 or isM5 ? 3 : isM15 or isM30 ? 5 : 7
+at_adxLen   = 14
+at_rsiLen   = isM1 or isM5 ? 10 : 14
+at_volLen   = 20
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 4  ─  MANUAL PARAMETER INPUTS
+// ═══════════════════════════════════════════════════════════════════
+grpHA    = "📊 Heikin Ashi"
+haBullClr   = input.color(color.white, "Bull color",           group=grpHA)
+haBearClr   = input.color(color.red,   "Bear color",           group=grpHA)
+haSmoothInp = input.int(5, "Smoothing (EMA period)", minval=1, group=grpHA)
+
+grpPCT   = "📈 PCTrend"
+trendLenInp = input.int(21,   "Trend EMA length",  minval=2,          group=grpPCT)
+atrLenInp   = input.int(14,   "ATR length",         minval=1,          group=grpPCT)
+atrFltInp   = input.float(0.10,"ATR filter mult",  minval=0, step=0.01,group=grpPCT)
+useHaConf   = input.bool(true, "Require HA alignment",                 group=grpPCT)
+
+grpBB    = "⚡ BB Trigger"
+bbDevInp    = input.float(2.0, "Bollinger deviation", minval=0.1, step=0.1, group=grpBB)
+bbPerInp    = input.int(12,    "BB period",            minval=2,              group=grpBB)
+bbSmInp     = input.int(5,     "Main smoothing",       minval=1,              group=grpBB)
+bbTrigInp   = input.int(3,     "Signal smoothing",     minval=1,              group=grpBB)
+bbSrc       = input.source(hlc3, "Source",                                    group=grpBB)
+
+grpSTi   = "🔱 Supertrend"
+stFactorInp = input.float(3.0, "Factor",     minval=0.5, step=0.1, group=grpSTi)
+stLenInp    = input.int(10,    "ATR length", minval=1,              group=grpSTi)
+
+grpFilt  = "🔬 Advanced Filters"
+useADX      = input.bool(true,  "ADX trend strength filter",    group=grpFilt)
+adxThresh   = input.int(22,     "Min ADX value",  minval=10, maxval=50, group=grpFilt)
+adxLenInp   = input.int(14,     "ADX/DI length",               group=grpFilt)
+useRSI      = input.bool(true,  "RSI extreme zone filter",      group=grpFilt)
+rsiLenInp   = input.int(14,     "RSI length",                   group=grpFilt)
+rsiOB       = input.int(72,     "RSI overbought — skip longs",  group=grpFilt)
+rsiOS       = input.int(28,     "RSI oversold — skip shorts",   group=grpFilt)
+useVWAP     = input.bool(true,  "VWAP bias filter",             group=grpFilt)
+useVol      = input.bool(true,  "Volume confirmation",          group=grpFilt)
+volLenInp   = input.int(20,     "Volume MA length",             group=grpFilt)
+useMTF      = input.bool(true,  "Higher-TF trend filter",       group=grpFilt)
+useSqueeze  = input.bool(false, "Block signals inside squeeze", group=grpFilt,
+     tooltip="When true, only take signals on squeeze RELEASE (breakout), not while ranging.")
+
+grpRisk  = "💰 Risk Management"
+stopMulInp  = input.float(2.0, "Stop-loss ATR multiplier", minval=0.5, step=0.1, group=grpRisk)
+tp1Mul      = input.float(1.0, "TP1 ATR multiplier (1/3)", minval=0.5, step=0.1, group=grpRisk)
+tp2Mul      = input.float(2.0, "TP2 ATR multiplier (1/3)", minval=0.5, step=0.1, group=grpRisk)
+tp3Mul      = input.float(3.0, "TP3 ATR multiplier (1/3)", minval=0.5, step=0.1, group=grpRisk)
+useTrail    = input.bool(true,  "Trailing stop after TP1",             group=grpRisk)
+trailMul    = input.float(1.5, "Trailing ATR multiplier",  minval=0.5, step=0.1, group=grpRisk)
+maxBarsOpen = input.int(120, "Max bars in trade (time exit)",minval=5, group=grpRisk)
+
+grpSig   = "🎯 Signal Quality"
+sigMode     = input.string("Balanced", "Signal mode",
+     options=["Aggressive","Balanced","Conservative"], group=grpSig,
+     tooltip="Aggressive=score≥4 | Balanced=score≥6 | Conservative=score≥8 out of 10")
+cooldownInp = input.int(2, "Cooldown bars between signals", minval=0, group=grpSig)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 5  ─  RESOLVED (auto vs manual) PARAMETERS
+// ═══════════════════════════════════════════════════════════════════
+trendLen = autoTune ? at_trendLen  : trendLenInp
+atrLen   = autoTune ? at_atrLen    : atrLenInp
+atrFlt   = autoTune ? at_atrFlt    : atrFltInp
+bbPer    = autoTune ? at_bbPer     : bbPerInp
+bbSm     = autoTune ? at_bbSm      : bbSmInp
+bbTrig   = autoTune ? at_bbTrig    : bbTrigInp
+stopMult = autoTune ? at_stopMult  : stopMulInp
+stFactor = autoTune ? at_stFact    : stFactorInp
+stLen    = autoTune ? at_stLen     : stLenInp
+haSm     = autoTune ? at_haSm      : haSmoothInp
+adxLen   = autoTune ? at_adxLen    : adxLenInp
+rsiLen   = autoTune ? at_rsiLen    : rsiLenInp
+volLen   = autoTune ? at_volLen    : volLenInp
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 6  ─  SMOOTHED HEIKIN ASHI
+// Smooth raw OHLC first → compute HA on smoothed values → reduces
+// false flips caused by single-bar spikes (crypto whipsaw fix)
+// ═══════════════════════════════════════════════════════════════════
+sO = ta.ema(open,  haSm)
+sH = ta.ema(high,  haSm)
+sL = ta.ema(low,   haSm)
+sC = ta.ema(close, haSm)
+
+var float shaOpen = na
+shaClose = (sO + sH + sL + sC) / 4.0
+shaOpen  := na(shaOpen[1]) ? (sO + sC) / 2.0 : (shaOpen[1] + shaClose[1]) / 2.0
+shaHigh  = math.max(sH, math.max(shaOpen, shaClose))
+shaLow   = math.min(sL, math.min(shaOpen, shaClose))
+
+shaBull      = shaClose > shaOpen
+shaCleanBull = shaBull     and shaLow  == math.min(shaOpen, shaClose)  // no lower wick
+shaCleanBear = not shaBull and shaHigh == math.max(shaOpen, shaClose)  // no upper wick
+shaFlipUp    = shaBull     and not shaBull[1]
+shaFlipDn    = not shaBull and shaBull[1]
+shaColor     = shaBull ? haBullClr : haBearClr
+
+plotcandle(showHA ? shaOpen : na, showHA ? shaHigh : na,
+           showHA ? shaLow  : na, showHA ? shaClose : na,
+     title="Smoothed HA", color=shaColor, wickcolor=shaColor,
+     bordercolor=shaColor, force_overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 7  ─  BB TRIGGER (normalized BB oscillator)
+// ═══════════════════════════════════════════════════════════════════
+bbBasis  = ta.sma(bbSrc, bbPer)
+bbBW     = ta.stdev(bbSrc, bbPer) * bbDevInp
+bbNorm   = bbBW == 0.0 ? 0.0 : 100.0 * (bbSrc - bbBasis) / bbBW
+bbMain   = ta.ema(bbNorm, bbSm)
+bbSignal = ta.ema(bbMain, bbTrig)
+
+trigCall = ta.crossover(bbMain, bbSignal)
+trigPut  = ta.crossunder(bbMain, bbSignal)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 8  ─  PCTrend  (lag-corrected EMA, ATR-noise-filtered)
+// ═══════════════════════════════════════════════════════════════════
+tradeAtr   = ta.atr(atrLen)
+trendLag_  = math.floor((trendLen - 1) / 2)
+adjSrc     = close + (close - nz(close[trendLag_], close))
+trendLine  = ta.ema(adjSrc, trendLen)
+trendThres = tradeAtr * atrFlt
+
+var int trendDir = 1
+trendDir := trendLine > trendLine[1] + trendThres ? 1 :
+            trendLine < trendLine[1] - trendThres ? -1 :
+            nz(trendDir[1], 1)
+
+trendClr = trendDir == 1 ? color.orange : color.blue
+plot(showTrend ? trendLine : na, "PCTrend",
+     color=trendClr, linewidth=2, force_overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 9  ─  SUPERTREND
+// ═══════════════════════════════════════════════════════════════════
+[stLine, stDir] = ta.supertrend(stFactor, stLen)
+stBull = stDir < 0
+stClr  = stBull ? color.new(color.lime, 55) : color.new(color.red, 55)
+plot(showST ? stLine : na, "Supertrend",
+     color=stClr, linewidth=1, style=plot.style_linebr, force_overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 10  ─  ADX + DIRECTIONAL INDEX
+// ═══════════════════════════════════════════════════════════════════
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxLen)
+adxStrong  = not useADX or adxVal >= adxThresh
+adxBullBias = diPlus  > diMinus
+adxBearBias = diMinus > diPlus
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 11  ─  RSI
+// ═══════════════════════════════════════════════════════════════════
+rsiVal      = ta.rsi(close, rsiLen)
+rsiOkLong   = not useRSI or rsiVal < rsiOB
+rsiOkShort  = not useRSI or rsiVal > rsiOS
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 12  ─  VWAP
+// ═══════════════════════════════════════════════════════════════════
+vwapVal     = ta.vwap(hlc3)
+aboveVWAP   = not useVWAP or close > vwapVal
+belowVWAP   = not useVWAP or close < vwapVal
+plot(showVWAP ? vwapVal : na, "VWAP",
+     color=color.new(color.purple, 25), linewidth=1, force_overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 13  ─  VOLUME
+// ═══════════════════════════════════════════════════════════════════
+volMA    = ta.sma(volume, volLen)
+volGood  = not useVol or na(volume) or volume >= volMA * 0.80
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 14  ─  SQUEEZE DETECTION  (BB inside Keltner Channel)
+// When BBs are squeezed inside KCs → market is coiling → avoid entries
+// Signal on squeeze RELEASE = high-probability breakout
+// ═══════════════════════════════════════════════════════════════════
+kcBasis   = ta.ema(close, bbPer)
+kcAtr     = ta.atr(bbPer) * 1.5
+kcUpper   = kcBasis + kcAtr
+kcLower   = kcBasis - kcAtr
+bbUpper   = bbBasis + bbBW
+bbLower   = bbBasis - bbBW
+inSqueeze = bbUpper < kcUpper and bbLower > kcLower
+sqzRelease= not inSqueeze and inSqueeze[1]
+sqzOkLong  = not useSqueeze or not inSqueeze
+sqzOkShort = not useSqueeze or not inSqueeze
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 15  ─  HIGHER TIMEFRAME TREND CONFIRMATION
+// ═══════════════════════════════════════════════════════════════════
+htfClose = request.security(syminfo.tickerid, htfRes, close,
+     lookahead=barmerge.lookahead_off)
+htfEma21 = request.security(syminfo.tickerid, htfRes,
+     ta.ema(close, 21), lookahead=barmerge.lookahead_off)
+htfBull  = not useMTF or htfClose > htfEma21
+htfBear  = not useMTF or htfClose < htfEma21
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 16  ─  MARKET STRUCTURE  (swing high / swing low tracking)
+// Prevents entries into exhausted moves; confirms trend via HH/HL or LL/LH
+// ═══════════════════════════════════════════════════════════════════
+swLen   = 5
+swHigh_ = ta.pivothigh(high, swLen, swLen)
+swLow_  = ta.pivotlow(low,  swLen, swLen)
+
+var float lastHH = na
+var float lastHL = na
+var float lastLL = na
+var float lastLH = na
+
+if not na(swHigh_)
+    if na(lastHH) or swHigh_ > lastHH
+        lastHH := swHigh_
+    else
+        lastLH := swHigh_
+
+if not na(swLow_)
+    if na(lastLL) or swLow_ < lastLL
+        lastLL := swLow_
+    else
+        lastHL := swLow_
+
+// Bull structure: we have a higher low (pullback held above prev low)
+structBull = not na(lastHL) and close > nz(lastHL, 0)
+// Bear structure: we have a lower high
+structBear = not na(lastLH) and close < nz(lastLH, 1e10)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 17  ─  WEIGHTED SIGNAL SCORING  (0 – 10)
+//
+// Component          Weight   Rationale
+// ────────────────   ──────   ─────────────────────────────────────
+// BB trigger cross     2      Core signal — highest weight
+// SHA direction        1      Trend candle filter
+// SHA clean candle     1      Conviction candle (no opposing wick)
+// PCTrend direction    1      Medium-term trend
+// Supertrend           1      ATR-based trend confirmation
+// ADX directional      1      +DI/-DI bias
+// HTF trend            1      Macro trend alignment
+// Market structure     1      HH/HL or LL/LH confirmation
+// Volume               1      Participation confirmation
+// ─────────────────────────────────────────────────────────────────
+// Max = 10.  Thresholds: Aggressive≥4 | Balanced≥6 | Conservative≥8
+// ═══════════════════════════════════════════════════════════════════
+callScore = (trigCall         ? 2 : 0)
+          + (shaBull          ? 1 : 0)
+          + (shaCleanBull     ? 1 : 0)
+          + (trendDir == 1    ? 1 : 0)
+          + (stBull           ? 1 : 0)
+          + (adxBullBias      ? 1 : 0)
+          + (htfBull          ? 1 : 0)
+          + (structBull       ? 1 : 0)
+          + (volGood          ? 1 : 0)
+
+putScore  = (trigPut          ? 2 : 0)
+          + (not shaBull      ? 1 : 0)
+          + (shaCleanBear     ? 1 : 0)
+          + (trendDir == -1   ? 1 : 0)
+          + (not stBull       ? 1 : 0)
+          + (adxBearBias      ? 1 : 0)
+          + (htfBear          ? 1 : 0)
+          + (structBear       ? 1 : 0)
+          + (volGood          ? 1 : 0)
+
+minScore  = sigMode == "Aggressive" ? 4 :
+            sigMode == "Balanced"   ? 6 : 8
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 18  ─  SIGNAL GATE (all filters combined)
+// ═══════════════════════════════════════════════════════════════════
+inDateRange = time >= startDate and time <= endDate
+allowLong   = tradeDir != "Short only"
+allowShort  = tradeDir != "Long only"
+
+// Drawdown circuit breaker
+var float peakEq = na
+peakEq := na(peakEq) or strategy.equity > peakEq ? strategy.equity : peakEq
+ddPct   = peakEq > 0 ? 100.0 * (peakEq - strategy.equity) / peakEq : 0.0
+ddOk    = ddPct < maxDDPct
+
+// Cooldown
+var int lastSigBar = na
+coolOk = na(lastSigBar) or (bar_index - lastSigBar) > cooldownInp
+
+// Final signals
+callSig = barstate.isconfirmed
+        and inDateRange and ddOk and coolOk
+        and trigCall
+        and callScore >= minScore
+        and rsiOkLong
+        and aboveVWAP
+        and sqzOkLong
+        and adxStrong
+        and (not useHaConf or shaBull)
+
+putSig  = barstate.isconfirmed
+        and inDateRange and ddOk and coolOk
+        and trigPut
+        and putScore  >= minScore
+        and rsiOkShort
+        and belowVWAP
+        and sqzOkShort
+        and adxStrong
+        and (not useHaConf or not shaBull)
+
+if callSig or putSig
+    lastSigBar := bar_index
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 19  ─  ATR-BASED POSITION SIZING
+// Dollar risk = equity × riskPct%
+// Qty = dollar risk / (ATR × stopMult)
+// → same dollar risk on every trade regardless of volatility
+// ═══════════════════════════════════════════════════════════════════
+riskAmt  = strategy.equity * (riskPct / 100.0)
+stopDist = tradeAtr * stopMult
+qtyCalc  = stopDist > 0 ? math.max(riskAmt / stopDist, 0.001) : 1.0
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 20  ─  ENTRIES
+// ═══════════════════════════════════════════════════════════════════
+var float entryAtr = na
+
+if callSig and allowLong and strategy.position_size <= 0
+    entryAtr := tradeAtr
+    strategy.entry("LONG", strategy.long, qty=qtyCalc,
+         comment="L " + str.tostring(callScore) + "/10")
+
+if putSig and allowShort and strategy.position_size >= 0
+    entryAtr := tradeAtr
+    strategy.entry("SHORT", strategy.short, qty=qtyCalc,
+         comment="S " + str.tostring(putScore) + "/10")
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 21  ─  EXITS
+// 3-tier take profit + trailing stop + time exit
+//
+// Tier 1 (33%): ATR × TP1 — quick partial to reduce risk
+// Tier 2 (33%): ATR × TP2 — main target
+// Tier 3 (34%): ATR × TP3 — with trailing stop to catch big moves
+// Stop loss: ATR × stopMult from entry (applied to all tiers)
+// ═══════════════════════════════════════════════════════════════════
+eAtr = nz(entryAtr, tradeAtr)
+
+longSL   = strategy.position_avg_price - eAtr * stopMult
+longTP1  = strategy.position_avg_price + eAtr * stopMult * tp1Mul
+longTP2  = strategy.position_avg_price + eAtr * stopMult * tp2Mul
+longTP3  = strategy.position_avg_price + eAtr * stopMult * tp3Mul
+
+shortSL  = strategy.position_avg_price + eAtr * stopMult
+shortTP1 = strategy.position_avg_price - eAtr * stopMult * tp1Mul
+shortTP2 = strategy.position_avg_price - eAtr * stopMult * tp2Mul
+shortTP3 = strategy.position_avg_price - eAtr * stopMult * tp3Mul
+
+trailTicks = eAtr * trailMul / syminfo.mintick
+
+if strategy.position_size > 0
+    strategy.exit("L-TP1", "LONG", qty_percent=33,  limit=longTP1, stop=longSL)
+    strategy.exit("L-TP2", "LONG", qty_percent=50,  limit=longTP2, stop=longSL)
+    strategy.exit("L-TP3", "LONG", qty_percent=100, limit=longTP3, stop=longSL,
+         trail_price = useTrail ? longTP1 : na,
+         trail_offset= useTrail ? trailTicks : na)
+
+if strategy.position_size < 0
+    strategy.exit("S-TP1", "SHORT", qty_percent=33,  limit=shortTP1, stop=shortSL)
+    strategy.exit("S-TP2", "SHORT", qty_percent=50,  limit=shortTP2, stop=shortSL)
+    strategy.exit("S-TP3", "SHORT", qty_percent=100, limit=shortTP3, stop=shortSL,
+         trail_price = useTrail ? shortTP1 : na,
+         trail_offset= useTrail ? trailTicks : na)
+
+// Time-based forced exit — prevents capital being locked in dead trades
+barsHeld = strategy.position_size != 0 and strategy.opentrades > 0 ?
+     bar_index - strategy.opentrades.entry_bar_index(0) : 0
+if barsHeld >= maxBarsOpen
+    strategy.close_all(comment="Time Exit")
+
+if time > endDate
+    strategy.close_all(comment="Backtest End")
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 22  ─  OVERLAY LINES (Stop / Target)
+// ═══════════════════════════════════════════════════════════════════
+activeSL = strategy.position_size > 0 ? longSL  :
+           strategy.position_size < 0 ? shortSL  : na
+activeTP = strategy.position_size > 0 ? longTP2 :
+           strategy.position_size < 0 ? shortTP2 : na
+
+plot(activeSL, "Stop Loss",    color=color.red,  linewidth=1,
+     style=plot.style_linebr, force_overlay=true)
+plot(activeTP, "Take Profit",  color=color.lime, linewidth=1,
+     style=plot.style_linebr, force_overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 23  ─  OSCILLATOR PANEL PLOTS
+// ═══════════════════════════════════════════════════════════════════
+hline(0,    "Zero",    color=color.new(color.gray, 55))
+hline(100,  "+100",   color=color.new(color.gray, 80), linestyle=hline.style_dotted)
+hline(-100, "-100",   color=color.new(color.gray, 80), linestyle=hline.style_dotted)
+
+plot(bbMain,   "BB Trigger", color=color.yellow,  linewidth=2)
+plot(bbSignal, "BB Signal",  color=color.red,     linewidth=1)
+plot(adxVal,   "ADX",        color=color.new(color.orange, 50), linewidth=1)
+hline(adxThresh, "ADX Min",   color=color.new(color.orange, 65), linestyle=hline.style_dotted)
+
+// Background: squeeze zone (yellow tint) | release (aqua tint)
+bgcolor(inSqueeze  ? color.new(color.yellow, 90) : na, title="Squeeze zone")
+bgcolor(sqzRelease ? color.new(color.aqua,   80) : na, title="Squeeze release")
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 24  ─  SIGNAL SHAPES ON CHART
+// ═══════════════════════════════════════════════════════════════════
+strongCall = callSig and callScore >= 8
+strongPut  = putSig  and putScore  >= 8
+
+// Strong signals (score 8-10)
+plotshape(showSignals and strongCall,
+     title="STRONG LONG",
+     style=shape.labelup, location=location.belowbar,
+     color=color.lime, text="▲ LONG ★", textcolor=color.black,
+     size=size.normal, force_overlay=true)
+
+plotshape(showSignals and strongPut,
+     title="STRONG SHORT",
+     style=shape.labeldown, location=location.abovebar,
+     color=color.red, text="▼ SHORT ★", textcolor=color.white,
+     size=size.normal, force_overlay=true)
+
+// Regular signals
+plotshape(showSignals and callSig and not strongCall,
+     title="LONG",
+     style=shape.labelup, location=location.belowbar,
+     color=color.new(color.lime, 20), text="▲", textcolor=color.black,
+     size=size.small, force_overlay=true)
+
+plotshape(showSignals and putSig and not strongPut,
+     title="SHORT",
+     style=shape.labeldown, location=location.abovebar,
+     color=color.new(color.red, 20), text="▼", textcolor=color.white,
+     size=size.small, force_overlay=true)
+
+// Rejected BB triggers (tiny dots in oscillator panel — shows filtered setups)
+plotshape(showSignals and trigCall and not callSig,
+     style=shape.circle, location=location.bottom,
+     color=color.new(color.lime, 45), size=size.tiny)
+plotshape(showSignals and trigPut and not putSig,
+     style=shape.circle, location=location.top,
+     color=color.new(color.red, 45), size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 25  ─  GUIDANCE DASHBOARD  (12 rows)
+// ═══════════════════════════════════════════════════════════════════
+curScore   = trigCall ? callScore : trigPut ? putScore :
+             trendDir == 1 ? callScore : putScore
+
+guidance   = callSig   ? (strongCall ? "◆ STRONG LONG"  : "▲ LONG")   :
+             putSig    ? (strongPut  ? "◆ STRONG SHORT" : "▼ SHORT")  :
+             trigCall  ? "⬆ LONG SETUP"  :
+             trigPut   ? "⬇ SHORT SETUP" : "● WAIT"
+
+guidClr    = callSig   ? color.lime :
+             putSig    ? color.red  :
+             trigCall  ? color.new(color.lime, 35) :
+             trigPut   ? color.new(color.red,  35) : color.orange
+
+posText    = strategy.position_size > 0  ? "▲ LONG OPEN"  :
+             strategy.position_size < 0  ? "▼ SHORT OPEN" : "FLAT"
+posClr     = strategy.position_size > 0  ? color.lime :
+             strategy.position_size < 0  ? color.red  : color.gray
+
+ddClr      = ddPct > maxDDPct * 0.75 ? color.red :
+             ddPct > maxDDPct * 0.5  ? color.orange : color.lime
+
+scoreClr   = curScore >= minScore     ? color.lime :
+             curScore >= minScore - 2 ? color.orange : color.red
+
+bg0 = color.rgb(18, 18, 38)
+bg1 = color.rgb(30, 30, 52)
+
+var table dash = table.new(position.top_right, 2, 13,
+     border_width=1, border_color=color.new(color.gray, 65),
+     frame_width=1,  frame_color=color.new(color.aqua, 60))
+
+if barstate.islast and showDash
+    table.cell(dash, 0, 0,  "◈ UCF PRO  " + tfName,
+         text_color=color.aqua,  bgcolor=bg0, text_size=size.small)
+    table.cell(dash, 1, 0,  sigMode,
+         text_color=color.white, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 1,  "Signal",    text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 1,  guidance,    text_color=guidClr,     bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 2,  "Score",     text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 2,  str.tostring(curScore) + " / 10",
+         text_color=scoreClr, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 3,  "Position",  text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 3,  posText,     text_color=posClr,      bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 4,  "PCTrend",   text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 4,  trendDir == 1 ? "BULL ▲" : "BEAR ▼",
+         text_color=trendDir == 1 ? color.lime : color.red, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 5,  "Supertrend",text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 5,  stBull ? "BULL ▲" : "BEAR ▼",
+         text_color=stBull ? color.lime : color.red, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 6,  "HTF (" + htfRes + ")",
+         text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 6,  htfClose > htfEma21 ? "BULL ▲" : "BEAR ▼",
+         text_color=htfClose > htfEma21 ? color.lime : color.red, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 7,  "ADX",       text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 7,  str.tostring(math.round(adxVal, 1)) +
+         (adxStrong ? "  ✓" : "  ✗ weak"),
+         text_color=adxStrong ? color.lime : color.orange, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 8,  "RSI",       text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 8,  str.tostring(math.round(rsiVal, 1)),
+         text_color=rsiVal > rsiOB ? color.red : rsiVal < rsiOS ? color.lime : color.white,
+         bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 9,  "VWAP",      text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 9,  close > vwapVal ? "Above ▲" : "Below ▼",
+         text_color=close > vwapVal ? color.lime : color.red, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 10, "Squeeze",   text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 10, inSqueeze ? "⚡ COILING" : sqzRelease ? "◎ RELEASED" : "Normal",
+         text_color=inSqueeze ? color.yellow : sqzRelease ? color.aqua : color.gray,
+         bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 11, "Drawdown",  text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 11, str.tostring(math.round(ddPct, 1)) + "%" +
+         (ddOk ? "" : "  ✗ HALTED"),
+         text_color=ddClr, bgcolor=bg0, text_size=size.small)
+
+    table.cell(dash, 0, 12, "Volume",    text_color=color.white, bgcolor=bg1, text_size=size.small)
+    table.cell(dash, 1, 12, volGood ? "✓ Active" : "✗ Low",
+         text_color=volGood ? color.lime : color.orange, bgcolor=bg0, text_size=size.small)
+
+if barstate.islast and not showDash
+    table.clear(dash, 0, 0, 1, 12)
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION 26  ─  ALERTS
+// ═══════════════════════════════════════════════════════════════════
+alertcondition(callSig and not strongCall,
+     title="UCF — LONG",
+     message="UCF LONG | {{ticker}} | {{close}} | Score: " +
+     str.tostring(callScore) + "/10 | TF: {{interval}}")
+
+alertcondition(strongCall,
+     title="UCF — STRONG LONG ★",
+     message="UCF STRONG LONG ★ | {{ticker}} | {{close}} | Score: " +
+     str.tostring(callScore) + "/10 | TF: {{interval}}")
+
+alertcondition(putSig and not strongPut,
+     title="UCF — SHORT",
+     message="UCF SHORT | {{ticker}} | {{close}} | Score: " +
+     str.tostring(putScore) + "/10 | TF: {{interval}}")
+
+alertcondition(strongPut,
+     title="UCF — STRONG SHORT ★",
+     message="UCF STRONG SHORT ★ | {{ticker}} | {{close}} | Score: " +
+     str.tostring(putScore) + "/10 | TF: {{interval}}")
+
+alertcondition(sqzRelease,
+     title="UCF — Squeeze Released",
+     message="Squeeze breakout imminent on {{ticker}} | {{interval}}")
+
+alertcondition(ddPct >= maxDDPct,
+     title="UCF — Drawdown Circuit Breaker",
+     message="TRADING HALTED: Drawdown " + str.tostring(math.round(ddPct,1)) +
+     "% reached on {{ticker}}")
