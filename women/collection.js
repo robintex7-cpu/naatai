@@ -1,0 +1,13 @@
+document.querySelectorAll('.product-card[data-href]').forEach(card=>{
+  card.addEventListener('click',e=>{
+    if(!e.target.closest('.product-card__quick-add')){
+      window.location.href=card.dataset.href;
+    }
+  });
+});
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
