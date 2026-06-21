@@ -69,7 +69,19 @@
   max-width: 80px;
   margin: 0 0.5rem;
   margin-bottom: 1rem;
+  position: relative;
+  overflow: hidden;
 }
+.step-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s ease;
+}
+.step-item.done + .step-line::after { transform: scaleX(1); }
 
 /* ===== Step Panels ===== */
 .config-step { display: none; }
@@ -80,6 +92,72 @@
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 2rem;
+}
+
+/* ===== Design Step Layout (preview + options) ===== */
+.config-step-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 2.5rem;
+  align-items: start;
+}
+.config-preview { position: sticky; top: 90px; }
+.preview-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.75rem 1.5rem 1.5rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.canvas-stage {
+  position: relative;
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(ellipse 70% 18% at 50% 96%, rgba(0,0,0,0.16), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 0%, var(--white) 0%, var(--off-white) 60%, var(--gray-100) 100%);
+  padding: 1.25rem 0.5rem 0;
+  overflow: hidden;
+}
+.preview-side-toggle {
+  display: inline-flex;
+  background: var(--off-white);
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.side-btn {
+  padding: 0.4rem 1.1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all var(--trans);
+  font-family: var(--font-body);
+}
+.side-btn.active { background: var(--navy); color: var(--white); }
+#jeansCanvas {
+  width: 100%;
+  height: auto;
+  max-width: 340px;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 18px 24px rgba(26,46,85,0.18));
+  transition: filter var(--trans);
+}
+.preview-side-toggle { box-shadow: var(--shadow-sm); }
+.preview-hint {
+  margin-top: 0.875rem;
+  font-size: 0.78rem;
+  color: var(--gray-400);
+  letter-spacing: 0.02em;
+}
+@media (max-width: 900px) {
+  .config-step-grid { grid-template-columns: 1fr; }
+  .config-preview { position: static; max-width: 360px; margin: 0 auto 1.5rem; }
 }
 
 /* ===== Config Groups ===== */
@@ -129,7 +207,11 @@
   background: var(--gold-pale);
   box-shadow: 0 0 0 1px var(--gold);
 }
-.opt-card-body:hover { border-color: var(--gold-light); }
+.opt-card-body:hover {
+  border-color: var(--gold-light);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(26,46,85,0.08);
+}
 .swatch {
   width: 48px;
   height: 48px;
@@ -235,6 +317,13 @@
   font-weight: 700;
   color: var(--navy);
   margin-left: 0.25rem;
+  display: inline-block;
+}
+.price-tag strong.bump { animation: priceBump 0.35s ease; }
+@keyframes priceBump {
+  0% { transform: scale(1); color: var(--navy); }
+  40% { transform: scale(1.18); color: var(--gold); }
+  100% { transform: scale(1); color: var(--navy); }
 }
 
 /* ===== Unit Toggle ===== */

@@ -65,6 +65,22 @@
       <div class="config-step active" id="step-1">
         <h2 class="config-step-title">Choose Your Design</h2>
 
+        <div class="config-step-grid">
+        <div class="config-preview">
+          <div class="preview-card">
+            <div class="preview-side-toggle">
+              <button type="button" class="side-btn active" id="btnFront" onclick="setPreviewSide('front')">Front</button>
+              <button type="button" class="side-btn" id="btnBack" onclick="setPreviewSide('back')">Back</button>
+            </div>
+            <div class="canvas-stage">
+              <canvas id="jeansCanvas" width="400" height="540" aria-label="Live preview of your custom jeans design" role="img"></canvas>
+            </div>
+            <p class="preview-hint">Live preview &mdash; updates as you design</p>
+          </div>
+        </div>
+
+        <div class="config-options">
+
         <div class="config-group">
           <h3 class="config-group-title">Fabric <span class="req">*</span></h3>
           <div class="option-cards">
@@ -157,9 +173,12 @@
             <button class="btn-video" onclick="viewVideo()">&#9654; View Video</button>
           </div>
           <div class="config-footer-right">
-            <div class="price-tag">Total: <strong id="totalPrice">&euro;99</strong></div>
+            <div class="price-tag">Total: <strong id="totalPrice" aria-live="polite">&euro;99</strong></div>
             <button class="btn btn-primary" onclick="goToStep(2)">Next: Measurement &rarr;</button>
           </div>
+        </div>
+
+        </div>
         </div>
       </div>
 
