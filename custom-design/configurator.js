@@ -236,7 +236,12 @@ function calcTotal() {
 function updatePrice() {
   var t = calcTotal();
   var el = document.getElementById('totalPrice');
-  if (el) el.textContent = '€' + t;
+  if (el) {
+    el.textContent = '€' + t;
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
 }
 
 // ===== Summary (step 3) =====

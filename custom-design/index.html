@@ -72,7 +72,9 @@
               <button type="button" class="side-btn active" id="btnFront" onclick="setPreviewSide('front')">Front</button>
               <button type="button" class="side-btn" id="btnBack" onclick="setPreviewSide('back')">Back</button>
             </div>
-            <canvas id="jeansCanvas" width="360" height="480" aria-label="Live preview of your custom jeans design" role="img"></canvas>
+            <div class="canvas-stage">
+              <canvas id="jeansCanvas" width="400" height="540" aria-label="Live preview of your custom jeans design" role="img"></canvas>
+            </div>
             <p class="preview-hint">Live preview &mdash; updates as you design</p>
           </div>
         </div>
