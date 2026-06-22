@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>naatai — Build Your Custom Jeans</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="logo" href="/">naatai</a>
+    <nav class="main-nav">
+      <a href="#">Men</a>
+      <a href="#">Women</a>
+      <a href="#" class="active">Custom Jeans</a>
+      <a href="#">Track Order</a>
+    </nav>
+  </div>
+</header>
+
+<main class="builder">
+  <div class="container builder-grid">
+
+    <!-- Live preview -->
+    <section class="preview-pane">
+      <div class="preview-stage" id="previewStage">
+        <div class="preview-jean" id="previewJean">
+          <div class="leg leg-left"></div>
+          <div class="leg leg-right"></div>
+        </div>
+      </div>
+      <div class="preview-summary">
+        <h2>Your Build</h2>
+        <ul id="summaryList" class="summary-list">
+          <li data-key="fit">Fit: <span>Slim</span></li>
+          <li data-key="wash">Wash: <span>Indigo</span></li>
+          <li data-key="fabric">Fabric: <span>Classic Denim</span></li>
+          <li data-key="waist">Waist: <span>32"</span></li>
+          <li data-key="inseam">Inseam: <span>32"</span></li>
+          <li data-key="stitch">Stitching: <span>Tonal</span></li>
+          <li data-key="hem">Hem: <span>Stock</span></li>
+        </ul>
+        <div class="price-row">
+          <span>Total</span>
+          <strong id="priceTotal">€129</strong>
+        </div>
+        <button class="btn-primary" id="addToCart">Add to Cart</button>
+      </div>
+    </section>
+
+    <!-- Steps -->
+    <section class="steps-pane">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="step active" data-step="1" data-key="fit">
+        <h1>Choose Your Fit</h1>
+        <p class="step-sub">Every body is different. Pick the silhouette that feels like you.</p>
+        <div class="option-grid" data-group="fit">
+          <button class="option-card" data-value="Skinny" data-price="0">
+            <span class="option-title">Skinny</span>
+            <span class="option-desc">Fitted through hip, thigh and leg</span>
+          </button>
+          <button class="option-card selected" data-value="Slim" data-price="0">
+            <span class="option-title">Slim</span>
+            <span class="option-desc">Close cut, tapered leg</span>
+          </button>
+          <button class="option-card" data-value="Straight" data-price="0">
+            <span class="option-title">Straight</span>
+            <span class="option-desc">Even width from hip to hem</span>
+          </button>
+          <button class="option-card" data-value="Relaxed" data-price="0">
+            <span class="option-title">Relaxed</span>
+            <span class="option-desc">Roomier seat and thigh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="step" data-step="2" data-key="wash">
+        <h1>Pick a Wash</h1>
+        <p class="step-sub">From deep indigo to bleached light — set the tone.</p>
+        <div class="option-grid swatch-grid" data-group="wash">
+          <button class="option-card swatch" data-value="Raw Black" data-price="0" style="--swatch:#161616">
+            <span class="swatch-dot"></span><span class="option-title">Raw Black</span>
+          </button>
+          <button class="option-card swatch selected" data-value="Indigo" data-price="0" style="--swatch:#2b3a67">
+            <span class="swatch-dot"></span><span class="option-title">Indigo</span>
+          </button>
+          <button class="option-card swatch" data-value="Mid Vintage" data-price="0" style="--swatch:#5b7aa3">
+            <span class="swatch-dot"></span><span class="option-title">Mid Vintage</span>
+          </button>
+          <button class="option-card swatch" data-value="Light Bleach" data-price="0" style="--swatch:#a9c0d8">
+            <span class="swatch-dot"></span><span class="option-title">Light Bleach</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="step" data-step="3" data-key="fabric">
+        <h1>Select Fabric</h1>
+        <p class="step-sub">Weight and stretch change how the jean wears all day.</p>
+        <div class="option-grid" data-group="fabric">
+          <button class="option-card selected" data-value="Classic Denim" data-price="0">
+            <span class="option-title">Classic Denim</span>
+            <span class="option-desc">12oz cotton, structured</span>
+          </button>
+          <button class="option-card" data-value="Comfort Stretch" data-price="10">
+            <span class="option-title">Comfort Stretch</span>
+            <span class="option-desc">98% cotton / 2% elastane</span>
+          </button>
+          <button class="option-card" data-value="Japanese Selvedge" data-price="35">
+            <span class="option-title">Japanese Selvedge</span>
+            <span class="option-desc">14oz, self-edge finish</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="step" data-step="4" data-key="measurements">
+        <h1>Your Measurements</h1>
+        <p class="step-sub">Enter inches for a tailored fit, or use a standard size.</p>
+        <div class="measure-grid">
+          <label>Waist (in)
+            <input type="number" id="waistInput" min="24" max="50" value="32">
+          </label>
+          <label>Inseam (in)
+            <input type="number" id="inseamInput" min="26" max="38" value="32">
+          </label>
+        </div>
+        <p class="hint">Need help measuring? Use a soft tape over your favorite-fitting pair.</p>
+      </div>
+
+      <div class="step" data-step="5" data-key="details">
+        <h1>Finishing Details</h1>
+        <p class="step-sub">Small touches, your call.</p>
+        <div class="option-grid" data-group="stitch">
+          <button class="option-card selected" data-value="Tonal" data-price="0">
+            <span class="option-title">Tonal Stitching</span>
+          </button>
+          <button class="option-card" data-value="Contrast" data-price="8">
+            <span class="option-title">Contrast Stitching</span>
+          </button>
+        </div>
+        <div class="option-grid" data-group="hem">
+          <button class="option-card selected" data-value="Stock" data-price="0">
+            <span class="option-title">Stock Hem</span>
+          </button>
+          <button class="option-card" data-value="Raw" data-price="6">
+            <span class="option-title">Raw Hem</span>
+          </button>
+          <button class="option-card" data-value="Cuffed" data-price="6">
+            <span class="option-title">Cuffed Hem</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-ghost" id="backBtn">Back</button>
+        <button class="btn-primary" id="nextBtn">Continue</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script src="js/configurator.js"></script>
+</body>
+</html>
