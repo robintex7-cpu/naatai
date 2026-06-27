@@ -1,0 +1,20 @@
+//@version=5
+// Heiken Ashi — faithful conversion of the MetaQuotes standard Heiken_Ashi.ex4
+// Colours from binary_breaker_update111.tpl: up candle = white, down = red.
+// Tip: open Settings -> right-click chart -> "Hide" the normal candles, or set
+// the chart bar style to "Bars" so these HA candles are clearly visible.
+indicator("Heiken Ashi (MT4 conversion)", overlay = true)
+
+upColor   = input.color(color.white, "Up candle")
+downColor = input.color(color.red,   "Down candle")
+
+// --- standard Heiken Ashi math (identical to the MT4 indicator) -----------
+haClose = (open + high + low + close) / 4.0
+var float haOpen = na
+haOpen := na(haOpen[1]) ? (open + close) / 2.0 : (haOpen[1] + haClose[1]) / 2.0
+haHigh = math.max(high, math.max(haOpen, haClose))
+haLow  = math.min(low,  math.min(haOpen, haClose))
+
+candleColor = haClose >= haOpen ? upColor : downColor
+plotcandle(haOpen, haHigh, haLow, haClose, title = "Heiken Ashi",
+     color = candleColor, wickcolor = candleColor, bordercolor = candleColor)

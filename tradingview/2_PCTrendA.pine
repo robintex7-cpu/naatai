@@ -1,0 +1,36 @@
+//@version=5
+// PCTrendA — faithful reconstruction of PCTrendA11.ex4 ("Put Option Call Option"
+// price-channel trend). The original .ex4 is compiled, so this rebuilds the
+// documented price-channel-breakout logic using YOUR .tpl settings:
+//   Length = 16, Displace = 0, Filter = 0.
+// It colours bars by trend and plots the channel; trend flips on a channel break
+// (matching the original's "possible trend change UP/DOWN" behaviour).
+indicator("PCTrendA (MT4 conversion)", overlay = true)
+
+length   = input.int(16, "Length", minval = 1)
+displace = input.int(0,  "Displace", minval = 0)
+filter   = input.float(0, "Filter (price units, 0 = off)", minval = 0)
+upCol    = input.color(color.rgb(255, 140, 0), "Up trend")   // .tpl 36095  -> orange
+dnCol    = input.color(color.rgb(0, 0, 255),   "Down trend") // .tpl 16711680 -> blue
+
+// --- price channel (use the PREVIOUS bar's channel so it can't repaint) ----
+upper = ta.highest(high, length)
+lower = ta.lowest(low,  length)
+upRef = displace > 0 ? upper[displace + 1] : upper[1]
+dnRef = displace > 0 ? lower[displace + 1] : lower[1]
+
+// --- trend state: flip up when close breaks above the channel high (+filter),
+//     flip down when it breaks below the channel low (-filter); else hold ----
+var int trend = 0
+brokeUp = close > upRef + filter
+brokeDn = close < dnRef - filter
+trend := brokeUp ? 1 : brokeDn ? -1 : nz(trend[1], 0)
+
+trendCol = trend > 0 ? upCol : trend < 0 ? dnCol : color.gray
+barcolor(trendCol)
+
+// channel + trailing trend line
+plot(upper, "Channel High", color = color.new(upCol, 70))
+plot(lower, "Channel Low",  color = color.new(dnCol, 70))
+trail = trend > 0 ? lower : upper
+plot(trail, "PCTrend", color = trendCol, linewidth = 2)

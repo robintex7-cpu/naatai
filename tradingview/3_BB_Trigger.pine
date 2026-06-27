@@ -1,0 +1,30 @@
+//@version=5
+// BB_Trigger — faithful reconstruction of BB_Trigger.ex4 ("Egodic CCI Trigger
+// Line", Louw Coetzer). The .ex4 is compiled; this rebuilds the documented
+// Ergodic-CCI algorithm (CCI, double-smoothed, plus a trigger/signal line)
+// using YOUR .tpl settings:
+//   pq = 2, pr = 10, ps = 5, trigger = 3.
+// Plots: main Ergodic line (yellow) + Trigger line (red), matching the .tpl
+// colours. Cross of main above trigger = LONG bias, below = SHORT, near zero =
+// NEUTRAL (these were the original's labels).
+indicator("BB_Trigger - Ergodic CCI (MT4 conversion)", overlay = false)
+
+pq      = input.int(2,  "pq (1st smoothing)", minval = 1)
+pr      = input.int(10, "pr (CCI length)",    minval = 1)
+ps      = input.int(5,  "ps (2nd smoothing)", minval = 1)
+trigger = input.int(3,  "trigger (signal)",   minval = 1)
+
+// --- Ergodic CCI ----------------------------------------------------------
+// CCI on the typical price (PRICE_TYPICAL = the MT4 default), then two stages
+// of exponential smoothing; the trigger line is an EMA of the result.
+cci     = ta.cci(hlc3, pr)
+sm1     = ta.ema(cci, pq)
+ergodic = ta.ema(sm1, ps)
+trig    = ta.ema(ergodic, trigger)
+
+mainCol = input.color(color.yellow, "Ergodic line") // .tpl 65535 -> yellow
+trigCol = input.color(color.red,    "Trigger line") // .tpl 255   -> red
+
+hline(0, "Zero", color = color.new(color.gray, 50))
+plot(ergodic, "Ergodic CCI", color = mainCol, linewidth = 2)
+plot(trig,    "Trigger",     color = trigCol, linewidth = 1)
