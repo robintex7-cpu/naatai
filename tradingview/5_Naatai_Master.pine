@@ -42,6 +42,14 @@ useErg    = input.bool(true,  "Require Ergodic CCI agreement", group = gF)
 useHA     = input.bool(true,  "Require Heiken Ashi agreement", group = gF)
 confirm   = input.bool(true,  "Confirm on bar close (no repaint)", group = gF)
 
+// ------------------------------------------------- signal-quality filters ----
+// These three fixes address late/counter-trend/whipsaw signals.
+gQ        = "Signal quality"
+useContext = input.bool(true, "Require EMA trend-context agreement (anti counter-trend)", group = gQ)
+useExhaust = input.bool(true, "Skip oversized breakout candle (anti-chase)", group = gQ)
+maxBrkATR  = input.float(2.5, "Max breakout candle size (x ATR)", minval = 1.0, step = 0.1, group = gQ)
+cooldown   = input.int(5,     "Min bars between signals (anti-whipsaw)", minval = 0, group = gQ)
+
 // PCTrend
 gPC      = "PCTrendA"
 length   = input.int(16, "Length", minval = 1, group = gPC)
@@ -146,11 +154,20 @@ saSellRaw = contracting and breakoutShort and shortImpulse
 // =============================================================================
 // Fuse setup + filters into final signals
 // =============================================================================
-buyOK  = saBuyRaw  and (not useTrend or trendUp) and (not useErg or ergBull) and (not useHA or haBull)
-sellOK = saSellRaw and (not useTrend or trendDn) and (not useErg or ergBear) and (not useHA or not haBull)
+// Anti-chase: a clean breakout candle should not be a giant exhaustion spike.
+notExhausted = not useExhaust or rng <= maxBrkATR * atr
+
+buyOK  = saBuyRaw  and (not useTrend or trendUp) and (not useErg or ergBull) and (not useHA or haBull)     and (not useContext or upCtx) and notExhausted
+sellOK = saSellRaw and (not useTrend or trendDn) and (not useErg or ergBear) and (not useHA or not haBull) and (not useContext or dnCtx) and notExhausted
 gate   = confirm ? barstate.isconfirmed : true
-buySig  = buyOK  and gate
-sellSig = sellOK and gate
+
+// Anti-whipsaw cooldown: no new signal within `cooldown` bars of the last one.
+var int lastSigBar = -1
+coolOK = lastSigBar < 0 or (bar_index - lastSigBar) >= cooldown
+buySig  = buyOK  and gate and coolOK
+sellSig = sellOK and gate and coolOK
+if buySig or sellSig
+    lastSigBar := bar_index
 
 buyLabel  = pivotBreakLong  ? "BUY 2nd"  : "BUY"
 sellLabel = pivotBreakShort ? "SELL 2nd" : "SELL"
