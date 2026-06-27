@@ -1,0 +1,218 @@
+//@version=5
+// =============================================================================
+// NAATAI MASTER — one complete TradingView indicator that combines:
+//   (A) your photo setup: Range Contraction -> Breakout (1st & 2nd entry),
+//   (B) your MT4 stack:   Heiken Ashi + PCTrendA + BB_Trigger (Ergodic CCI),
+// fused into BUY/SELL signals with entry/stop/target lines and alerts.
+//
+// MT4 settings preserved from binary_breaker_update111.tpl:
+//   Heiken Ashi up=white/down=red | PCTrendA Length 16 | Ergodic pq2 pr10 ps5 trig3
+//
+// No repaint: the contraction box, channel and pivots use only PAST bars and
+// signals confirm on bar close. No extra smoothing is added (minimum lag).
+// =============================================================================
+indicator("Naatai Master (Breakout + HA + PCTrend + Ergodic)", overlay = true, max_lines_count = 500)
+
+// ----------------------------------------------------------------- toggles ---
+gM        = "Display"
+showHA    = input.bool(false, "Heiken Ashi candles (hides? use bar style)", group = gM)
+showChan  = input.bool(true,  "PCTrend channel",  group = gM)
+colorBars = input.bool(true,  "Colour bars by trend", group = gM)
+showSig   = input.bool(true,  "BUY/SELL signals",  group = gM)
+showLevels= input.bool(true,  "Entry / Stop / Target lines", group = gM)
+showTable = input.bool(true,  "Status table",      group = gM)
+
+// ---------------------------------------------------- (A) breakout setup -----
+gSA   = "Breakout setup (from your chart)"
+boxBars     = input.int(6,    "Contraction box length",  minval = 2, group = gSA)
+impLook     = input.int(6,    "Impulse lookback",        minval = 2, group = gSA)
+impBodyR    = input.float(0.55,"Impulse 'full body' ratio", minval = 0.1, maxval = 1, group = gSA)
+brkBodyR    = input.float(0.50,"Breakout candle body ratio", minval = 0.1, maxval = 1, group = gSA)
+contractR   = input.float(0.75,"Contraction ratio (box vs impulse)", minval = 0.1, maxval = 1, group = gSA)
+maxBoxATR   = input.float(2.5, "Max box height (x ATR)",  minval = 0.5, group = gSA)
+brkBuffer   = input.float(0.0008,"Breakout buffer (fraction)", minval = 0, step = 0.0001, group = gSA)
+atrLen      = input.int(14,   "ATR length",              minval = 1, group = gSA)
+pivLeft     = input.int(3,    "Pivot left",              minval = 1, group = gSA)
+pivRight    = input.int(3,    "Pivot right",             minval = 1, group = gSA)
+
+// ------------------------------------------------------ (B) filters / MT4 ----
+gF        = "Confirmation filters"
+useTrend  = input.bool(true,  "Require PCTrend agreement",  group = gF)
+useErg    = input.bool(true,  "Require Ergodic CCI agreement", group = gF)
+useHA     = input.bool(true,  "Require Heiken Ashi agreement", group = gF)
+confirm   = input.bool(true,  "Confirm on bar close (no repaint)", group = gF)
+
+// PCTrend
+gPC      = "PCTrendA"
+length   = input.int(16, "Length", minval = 1, group = gPC)
+upCol    = input.color(color.rgb(255, 140, 0), "Up trend",   group = gPC)
+dnCol    = input.color(color.rgb(0, 0, 255),   "Down trend", group = gPC)
+// Ergodic CCI
+gBB     = "BB_Trigger (Ergodic CCI)"
+pq      = input.int(2,  "pq (1st smoothing)", minval = 1, group = gBB)
+pr      = input.int(10, "pr (CCI length)",    minval = 1, group = gBB)
+ps      = input.int(5,  "ps (2nd smoothing)", minval = 1, group = gBB)
+trigger = input.int(3,  "trigger (signal)",   minval = 1, group = gBB)
+// Heiken Ashi colours
+gHA     = "Heiken Ashi"
+haUpCol = input.color(color.white, "Up candle",   group = gHA)
+haDnCol = input.color(color.red,   "Down candle", group = gHA)
+
+// =============================================================================
+// Indicator maths
+// =============================================================================
+atr  = ta.atr(atrLen)
+rng  = high - low
+body = math.abs(close - open)
+bodyR = rng > 0 ? body / rng : 0.0
+
+// ---- Heiken Ashi ----
+haClose = (open + high + low + close) / 4.0
+var float haOpen = na
+haOpen := na(haOpen[1]) ? (open + close) / 2.0 : (haOpen[1] + haClose[1]) / 2.0
+haHigh  = math.max(high, math.max(haOpen, haClose))
+haLow   = math.min(low,  math.min(haOpen, haClose))
+haBull  = haClose >= haOpen
+
+plotcandle(showHA ? haOpen : na, showHA ? haHigh : na, showHA ? haLow : na, showHA ? haClose : na,
+     title = "Heiken Ashi", color = haBull ? haUpCol : haDnCol,
+     wickcolor = haBull ? haUpCol : haDnCol, bordercolor = haBull ? haUpCol : haDnCol)
+
+// ---- PCTrend (price-channel breakout trend; uses previous bar = no repaint) -
+upper = ta.highest(high, length)
+lower = ta.lowest(low,  length)
+var int trend = 0
+trend := close > upper[1] ? 1 : close < lower[1] ? -1 : nz(trend[1], 0)
+trendUp = trend > 0
+trendDn = trend < 0
+trendCol = trendUp ? upCol : trendDn ? dnCol : color.gray
+barcolor(colorBars ? trendCol : na)
+plot(showChan ? upper : na, "Channel High", color = color.new(upCol, 70))
+plot(showChan ? lower : na, "Channel Low",  color = color.new(dnCol, 70))
+
+// ---- Ergodic CCI ----
+cci     = ta.cci(hlc3, pr)
+ergodic = ta.ema(ta.ema(cci, pq), ps)
+trig    = ta.ema(ergodic, trigger)
+ergBull = ergodic > trig
+ergBear = ergodic < trig
+
+// ---- higher-timeframe trend context (EMA stack) ----
+emaFast = ta.ema(close, 20)
+emaSlow = ta.ema(close, 50)
+upCtx   = emaFast > emaSlow and close > emaSlow
+dnCtx   = emaFast < emaSlow and close < emaSlow
+
+// =============================================================================
+// (A) Range Contraction -> Breakout detection
+// =============================================================================
+// Box = the `boxBars` candles BEFORE the current (breakout) candle.
+boxHigh = ta.highest(high, boxBars)[1]
+boxLow  = ta.lowest(low,  boxBars)[1]
+boxHeight = boxHigh - boxLow
+
+// Average candle size in the box vs in the impulse window just before it.
+avgBoxRange = ta.sma(rng, boxBars)[1]
+avgBoxBody  = ta.sma(body, boxBars)[1]
+avgImpRange = ta.sma(rng, impLook)[boxBars + 1]
+avgImpBody  = ta.sma(body, impLook)[boxBars + 1]
+
+contracting = avgImpRange > 0 and avgBoxRange <= contractR * avgImpRange and avgBoxBody < avgImpBody and boxHeight <= maxBoxATR * atr
+
+// Institutional impulse (a full-body candle) somewhere in the impulse window.
+strongBull = (close > open and bodyR >= impBodyR) ? 1.0 : 0.0
+strongBear = (close < open and bodyR >= impBodyR) ? 1.0 : 0.0
+longImpulse  = ta.highest(strongBull, impLook)[boxBars + 1] >= 1
+shortImpulse = ta.highest(strongBear, impLook)[boxBars + 1] >= 1
+
+// Breakout candle (current bar, strong full body closing beyond the box).
+breakoutLong  = close > boxHigh * (1 + brkBuffer) and close > open and bodyR >= brkBodyR
+breakoutShort = close < boxLow  * (1 - brkBuffer) and close < open and bodyR >= brkBodyR
+
+// Pivot breaker (2nd entry): breakout that also clears the last confirmed pivot.
+ph = ta.pivothigh(high, pivLeft, pivRight)
+pl = ta.pivotlow(low,  pivLeft, pivRight)
+var float lastPH = na
+var float lastPL = na
+lastPH := na(ph) ? lastPH : ph
+lastPL := na(pl) ? lastPL : pl
+pivotBreakLong  = not na(lastPH) and close > lastPH
+pivotBreakShort = not na(lastPL) and close < lastPL
+
+// Raw setup signals.
+saBuyRaw  = contracting and breakoutLong  and longImpulse
+saSellRaw = contracting and breakoutShort and shortImpulse
+
+// =============================================================================
+// Fuse setup + filters into final signals
+// =============================================================================
+buyOK  = saBuyRaw  and (not useTrend or trendUp) and (not useErg or ergBull) and (not useHA or haBull)
+sellOK = saSellRaw and (not useTrend or trendDn) and (not useErg or ergBear) and (not useHA or not haBull)
+gate   = confirm ? barstate.isconfirmed : true
+buySig  = buyOK  and gate
+sellSig = sellOK and gate
+
+buyLabel  = pivotBreakLong  ? "BUY 2nd"  : "BUY"
+sellLabel = pivotBreakShort ? "SELL 2nd" : "SELL"
+
+plotshape(showSig and buySig,  title = "BUY",  style = shape.labelup,
+     location = location.belowbar, color = color.new(color.green, 0),
+     text = "BUY", textcolor = color.white, size = size.small)
+plotshape(showSig and sellSig, title = "SELL", style = shape.labeldown,
+     location = location.abovebar, color = color.new(color.red, 0),
+     text = "SELL", textcolor = color.white, size = size.small)
+
+// =============================================================================
+// Entry / Stop / Target levels (held until the next signal)
+// =============================================================================
+var float lvlEntry = na
+var float lvlStop  = na
+var float lvlT1 = na
+var float lvlT2 = na
+var float lvlT3 = na
+if buySig
+    lvlEntry := close
+    lvlStop  := boxLow - 0.1 * atr
+    r = lvlEntry - lvlStop
+    lvlT1 := lvlEntry + r
+    lvlT2 := lvlEntry + 2 * r
+    lvlT3 := lvlEntry + 3 * r
+if sellSig
+    lvlEntry := close
+    lvlStop  := boxHigh + 0.1 * atr
+    r = lvlStop - lvlEntry
+    lvlT1 := lvlEntry - r
+    lvlT2 := lvlEntry - 2 * r
+    lvlT3 := lvlEntry - 3 * r
+
+plot(showLevels ? lvlEntry : na, "Entry", color = color.new(color.blue, 0),  style = plot.style_linebr)
+plot(showLevels ? lvlStop  : na, "Stop",  color = color.new(color.red, 0),   style = plot.style_linebr)
+plot(showLevels ? lvlT1    : na, "T1",    color = color.new(color.green, 0),  style = plot.style_linebr)
+plot(showLevels ? lvlT2    : na, "T2",    color = color.new(color.green, 30), style = plot.style_linebr)
+plot(showLevels ? lvlT3    : na, "T3",    color = color.new(color.green, 60), style = plot.style_linebr)
+
+// =============================================================================
+// Alerts
+// =============================================================================
+alertcondition(buySig,  title = "Naatai BUY",  message = "Naatai BUY {{ticker}} {{interval}} @ {{close}}")
+alertcondition(sellSig, title = "Naatai SELL", message = "Naatai SELL {{ticker}} {{interval}} @ {{close}}")
+if buySig
+    alert("Naatai " + buyLabel + " " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+if sellSig
+    alert("Naatai " + sellLabel + " " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+
+// =============================================================================
+// Status table
+// =============================================================================
+var table t = table.new(position.top_right, 2, 5, border_width = 1)
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "Trend", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 0, trendUp ? "UP" : trendDn ? "DOWN" : "FLAT", text_color = color.white, bgcolor = trendCol)
+    table.cell(t, 0, 1, "Heiken Ashi", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 1, haBull ? "BULL" : "BEAR", text_color = color.white, bgcolor = haBull ? color.green : color.red)
+    table.cell(t, 0, 2, "Ergodic CCI", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 2, ergBull ? "LONG" : ergBear ? "SHORT" : "NEUTRAL", text_color = color.white, bgcolor = ergBull ? color.green : ergBear ? color.red : color.gray)
+    table.cell(t, 0, 3, "Contraction", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 3, contracting ? "YES" : "no", text_color = color.white, bgcolor = contracting ? color.green : color.new(color.gray, 40))
+    table.cell(t, 0, 4, "Context", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 4, upCtx ? "UP" : dnCtx ? "DOWN" : "MIXED", text_color = color.white, bgcolor = upCtx ? color.green : dnCtx ? color.red : color.gray)
