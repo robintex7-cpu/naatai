@@ -1,0 +1,127 @@
+//@version=5
+// =============================================================================
+// NAATAI COMBO  —  Heiken Ashi + PCTrendA + BB_Trigger (Ergodic CCI) in ONE
+// indicator, converted from the MT4 template binary_breaker_update111.tpl.
+//
+// The three MT4 .ex4 files are compiled (no source inside them), so each part
+// below is a faithful reconstruction of the known algorithm using the EXACT
+// settings from your .tpl:
+//     Heiken Ashi  : up = white, down = red
+//     PCTrendA     : Length 16, Displace 0, Filter 0
+//     BB_Trigger   : pq 2, pr 10, ps 5, trigger 3
+//
+// "The help": the three are fused into confluence BUY/SELL signals + alerts.
+// Nothing repaints — channel/trend use the previous bar, signals confirm on
+// bar close. No extra smoothing is added, so lag is only each indicator's own.
+// =============================================================================
+indicator("Naatai Combo (HA + PCTrend + Ergodic CCI)", overlay = true,
+     max_labels_count = 500)
+
+// ---- module toggles ----------------------------------------------------------
+gM        = "Modules"
+showHA    = input.bool(true,  "Show Heiken Ashi candles", group = gM)
+showChan  = input.bool(true,  "Show PCTrend channel",     group = gM)
+colorBars = input.bool(true,  "Colour bars by trend",     group = gM)
+showSig   = input.bool(true,  "Show BUY/SELL signals",    group = gM)
+showTable = input.bool(true,  "Show status table",        group = gM)
+
+// ---- Heiken Ashi (Heiken_Ashi11.ex4) ----------------------------------------
+gHA     = "Heiken Ashi"
+haUpCol = input.color(color.white, "Up candle",   group = gHA)
+haDnCol = input.color(color.red,   "Down candle", group = gHA)
+
+haClose = (open + high + low + close) / 4.0
+var float haOpen = na
+haOpen := na(haOpen[1]) ? (open + close) / 2.0 : (haOpen[1] + haClose[1]) / 2.0
+haHigh  = math.max(high, math.max(haOpen, haClose))
+haLow   = math.min(low,  math.min(haOpen, haClose))
+haBull  = haClose >= haOpen
+
+plotcandle(showHA ? haOpen  : na, showHA ? haHigh : na,
+           showHA ? haLow   : na, showHA ? haClose : na,
+     title = "Heiken Ashi", color = haBull ? haUpCol : haDnCol,
+     wickcolor = haBull ? haUpCol : haDnCol, bordercolor = haBull ? haUpCol : haDnCol)
+
+// ---- PCTrendA (PCTrendA11.ex4) ----------------------------------------------
+gPC      = "PCTrendA"
+length   = input.int(16, "Length",   minval = 1, group = gPC)
+displace = input.int(0,  "Displace", minval = 0, group = gPC)
+filter   = input.float(0, "Filter (price units, 0 = off)", minval = 0, group = gPC)
+upCol    = input.color(color.rgb(255, 140, 0), "Up trend",   group = gPC)
+dnCol    = input.color(color.rgb(0, 0, 255),   "Down trend", group = gPC)
+
+upper = ta.highest(high, length)
+lower = ta.lowest(low,  length)
+upRef = displace > 0 ? upper[displace + 1] : upper[1]
+dnRef = displace > 0 ? lower[displace + 1] : lower[1]
+
+var int trend = 0
+brokeUp = close > upRef + filter
+brokeDn = close < dnRef - filter
+trend := brokeUp ? 1 : brokeDn ? -1 : nz(trend[1], 0)
+trendUp = trend > 0
+trendDn = trend < 0
+trendCol = trendUp ? upCol : trendDn ? dnCol : color.gray
+
+barcolor(colorBars ? trendCol : na)
+plot(showChan ? upper : na, "Channel High", color = color.new(upCol, 70))
+plot(showChan ? lower : na, "Channel Low",  color = color.new(dnCol, 70))
+plot(showChan ? (trendUp ? lower : upper) : na, "PCTrend",
+     color = trendCol, linewidth = 2)
+
+// ---- BB_Trigger : Ergodic CCI (BB_Trigger.ex4) ------------------------------
+gBB     = "BB_Trigger (Ergodic CCI)"
+pq      = input.int(2,  "pq (1st smoothing)", minval = 1, group = gBB)
+pr      = input.int(10, "pr (CCI length)",    minval = 1, group = gBB)
+ps      = input.int(5,  "ps (2nd smoothing)", minval = 1, group = gBB)
+trigger = input.int(3,  "trigger (signal)",   minval = 1, group = gBB)
+
+cci     = ta.cci(hlc3, pr)
+ergodic = ta.ema(ta.ema(cci, pq), ps)
+trig    = ta.ema(ergodic, trigger)
+ergBull = ergodic > trig
+ergState = ergodic > trig ? "LONG" : ergodic < trig ? "SHORT" : "NEUTRAL"
+
+// ---- Confluence signals (the help) ------------------------------------------
+gSG       = "Signals"
+needAll   = input.bool(true, "Require ALL three to agree", group = gSG)
+confirm   = input.bool(true, "Confirm on bar close (no repaint)", group = gSG)
+
+crossUp = ta.crossover(ergodic, trig)
+crossDn = ta.crossunder(ergodic, trig)
+
+buyRaw  = needAll ? (trendUp and haBull and crossUp)  : (crossUp and (trendUp or haBull))
+sellRaw = needAll ? (trendDn and not haBull and crossDn) : (crossDn and (trendDn or not haBull))
+ok      = confirm ? barstate.isconfirmed : true
+buySig  = buyRaw and ok
+sellSig = sellRaw and ok
+
+plotshape(showSig and buySig,  title = "BUY",  style = shape.labelup,
+     location = location.belowbar, color = color.new(color.green, 0),
+     text = "BUY",  textcolor = color.white, size = size.small)
+plotshape(showSig and sellSig, title = "SELL", style = shape.labeldown,
+     location = location.abovebar, color = color.new(color.red, 0),
+     text = "SELL", textcolor = color.white, size = size.small)
+
+alertcondition(buySig,  title = "Naatai BUY",  message = "Naatai BUY {{ticker}} {{interval}} @ {{close}}")
+alertcondition(sellSig, title = "Naatai SELL", message = "Naatai SELL {{ticker}} {{interval}} @ {{close}}")
+if buySig
+    alert("Naatai BUY " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+if sellSig
+    alert("Naatai SELL " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+
+// ---- Status table ------------------------------------------------------------
+var table t = table.new(position.top_right, 2, 4, border_width = 1)
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "Trend",   text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 0, trendUp ? "UP" : trendDn ? "DOWN" : "FLAT",
+         text_color = color.white, bgcolor = trendCol)
+    table.cell(t, 0, 1, "Heiken Ashi", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 1, haBull ? "BULL" : "BEAR",
+         text_color = color.white, bgcolor = haBull ? color.green : color.red)
+    table.cell(t, 0, 2, "Ergodic CCI", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 2, ergState, text_color = color.white,
+         bgcolor = ergBull ? color.green : color.red)
+    table.cell(t, 0, 3, "Value", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 3, str.tostring(ergodic, "#.##"),
+         text_color = color.white, bgcolor = color.new(color.blue, 30))
