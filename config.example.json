@@ -1,0 +1,34 @@
+{
+  "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"],
+  "auto_top_symbols": 0,
+  "timeframes": ["4h", "1d"],
+  "poll_interval_seconds": 300,
+  "alert_on_watch": false,
+  "min_confidence": 60,
+  "alerts": {
+    "console": true,
+    "file": "signals.log",
+    "telegram_token": "",
+    "telegram_chat_id": "",
+    "webhook_url": ""
+  },
+  "strategy": {
+    "ema_fast": 20,
+    "ema_slow": 50,
+    "use_trend_filter": true,
+    "box_bars": 6,
+    "contraction_ratio": 0.75,
+    "max_box_atr_mult": 2.5,
+    "impulse_lookback": 6,
+    "impulse_body_ratio": 0.55,
+    "breakout_body_ratio": 0.5,
+    "breakout_buffer": 0.0008,
+    "require_volume": true,
+    "volume_mult": 1.1,
+    "pivot_left": 3,
+    "pivot_right": 3,
+    "atr_period": 14,
+    "target_r_multiples": [1.0, 2.0, 3.0],
+    "min_candles": 60
+  }
+}

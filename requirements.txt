@@ -1,0 +1,7 @@
+# Naatai core runs on the Python 3.9+ standard library only — no install needed.
+# This file is intentionally minimal. Optional extras for development:
+#
+#   pytest    # to run the test suite
+#
+# Alerts (Telegram / Discord / Slack) use urllib from the stdlib, so they
+# require no third-party packages either.
