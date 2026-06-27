@@ -1,84 +1,76 @@
 //@version=5
 // =============================================================================
-// NAATAI MASTER — one complete TradingView indicator that combines:
-//   (A) your photo setup: Range Contraction -> Breakout (1st & 2nd entry),
-//   (B) your MT4 stack:   Heiken Ashi + PCTrendA + BB_Trigger (Ergodic CCI),
-// fused into BUY/SELL signals with entry/stop/target lines and alerts.
+// NAATAI MASTER v4 — quality-first signals
+//   Core confirmations (your two most important): PCTrend + BB_Trigger(Ergodic)
+//   Extra filters/context: Parabolic SAR, EMA trend context, Heiken Ashi
+//   Tools drawn: Support/Resistance, Fibonacci, PSAR dots, reversal markers
 //
-// MT4 settings preserved from binary_breaker_update111.tpl:
-//   Heiken Ashi up=white/down=red | PCTrendA Length 16 | Ergodic pq2 pr10 ps5 trig3
+// QUALITY RULE: a BUY/SELL fires only on the bar where ALL required
+// confirmations FIRST agree (a state change) — not on every trending bar.
+// Then it stays silent until they break and realign. This is what removes the
+// "BUY-BUY-BUY / SELL-SELL-SELL" clusters.
 //
-// No repaint: the contraction box, channel and pivots use only PAST bars and
-// signals confirm on bar close. No extra smoothing is added (minimum lag).
+// No repaint: channel/pivots use past bars, signals confirm on close.
 // =============================================================================
 indicator("Naatai Master (Breakout + HA + PCTrend + Ergodic)", overlay = true, max_lines_count = 500)
 
-// ----------------------------------------------------------------- toggles ---
+// ----------------------------------------------------------------- display ---
 gM        = "Display"
-showHA    = input.bool(false, "Heiken Ashi candles (hides? use bar style)", group = gM)
+showHA    = input.bool(false, "Heiken Ashi candles", group = gM)
 showChan  = input.bool(true,  "PCTrend channel",  group = gM)
 colorBars = input.bool(true,  "Colour bars by trend", group = gM)
 showSig   = input.bool(true,  "BUY/SELL signals",  group = gM)
 showLevels= input.bool(true,  "Entry / Stop / Target lines", group = gM)
+showPSAR  = input.bool(true,  "Parabolic SAR dots", group = gM)
+showSR    = input.bool(true,  "Support / Resistance", group = gM)
+showFib   = input.bool(false, "Fibonacci levels", group = gM)
+showRev   = input.bool(true,  "Trend-reversal markers", group = gM)
 showTable = input.bool(true,  "Status table",      group = gM)
 
-// ---------------------------------------------------- (A) breakout setup -----
-gSA   = "Breakout setup (from your chart)"
-boxBars     = input.int(6,    "Contraction box length",  minval = 2, group = gSA)
-impLook     = input.int(6,    "Impulse lookback",        minval = 2, group = gSA)
-impBodyR    = input.float(0.55,"Impulse 'full body' ratio", minval = 0.1, maxval = 1, group = gSA)
-brkBodyR    = input.float(0.50,"Breakout candle body ratio", minval = 0.1, maxval = 1, group = gSA)
-contractR   = input.float(0.75,"Contraction ratio (box vs impulse)", minval = 0.1, maxval = 1, group = gSA)
-maxBoxATR   = input.float(2.5, "Max box height (x ATR)",  minval = 0.5, group = gSA)
-brkBuffer   = input.float(0.0008,"Breakout buffer (fraction)", minval = 0, step = 0.0001, group = gSA)
-atrLen      = input.int(14,   "ATR length",              minval = 1, group = gSA)
-pivLeft     = input.int(3,    "Pivot left",              minval = 1, group = gSA)
-pivRight    = input.int(3,    "Pivot right",             minval = 1, group = gSA)
+// ------------------------------------------------- signal confirmations ------
+// Your two most important are ON and recommended to stay ON.
+gC        = "Signal confirmations (quality)"
+reqPCTrend = input.bool(true,  "Require PCTrend agreement  (KEY)", group = gC)
+reqErgodic = input.bool(true,  "Require Ergodic CCI agreement  (KEY)", group = gC)
+reqPSAR    = input.bool(true,  "Require Parabolic SAR agreement", group = gC)
+reqContext = input.bool(true,  "Require EMA trend-context agreement", group = gC)
+reqHA      = input.bool(false, "Require Heiken Ashi agreement", group = gC)
+confirm    = input.bool(true,  "Confirm on bar close (no repaint)", group = gC)
+cooldown   = input.int(8,      "Min bars between signals", minval = 0, group = gC)
 
-// ------------------------------------------------------ (B) filters / MT4 ----
-gF        = "Confirmation filters"
-useTrend  = input.bool(true,  "Require PCTrend agreement",  group = gF)
-useErg    = input.bool(true,  "Require Ergodic CCI agreement", group = gF)
-useHA     = input.bool(true,  "Require Heiken Ashi agreement", group = gF)
-confirm   = input.bool(true,  "Confirm on bar close (no repaint)", group = gF)
-
-// ----------------------------------------------------------- signal modes ----
-gMODE     = "Signal modes (turn engines on/off)"
-useBreakout = input.bool(true, "Breakout engine (contraction -> breakout)", group = gMODE)
-useTrendPB  = input.bool(true, "Trend-continuation engine (pullback in trend)", group = gMODE)
-
-// ------------------------------------------------- signal-quality filters ----
-// These fixes address late/counter-trend/whipsaw signals. Exhaustion applies to
-// the BREAKOUT engine only, so strong trend moves are not filtered away.
-gQ        = "Signal quality"
-useContext = input.bool(true, "Require EMA trend-context agreement (anti counter-trend)", group = gQ)
-useExhaust = input.bool(true, "Skip oversized breakout candle (breakout engine only)", group = gQ)
-maxBrkATR  = input.float(3.0, "Max breakout candle size (x ATR)", minval = 1.0, step = 0.1, group = gQ)
-cooldown   = input.int(3,     "Min bars between signals (anti-whipsaw)", minval = 0, group = gQ)
-
-// PCTrend
+// ------------------------------------------------------------------ PCTrend --
 gPC      = "PCTrendA"
 length   = input.int(16, "Length", minval = 1, group = gPC)
 upCol    = input.color(color.rgb(255, 140, 0), "Up trend",   group = gPC)
 dnCol    = input.color(color.rgb(0, 0, 255),   "Down trend", group = gPC)
-// Ergodic CCI
+// ------------------------------------------------------- BB_Trigger Ergodic --
 gBB     = "BB_Trigger (Ergodic CCI)"
 pq      = input.int(2,  "pq (1st smoothing)", minval = 1, group = gBB)
 pr      = input.int(10, "pr (CCI length)",    minval = 1, group = gBB)
 ps      = input.int(5,  "ps (2nd smoothing)", minval = 1, group = gBB)
 trigger = input.int(3,  "trigger (signal)",   minval = 1, group = gBB)
-// Heiken Ashi colours
+// ----------------------------------------------------------- Parabolic SAR --
+gSAR    = "Parabolic SAR"
+sarStart = input.float(0.02, "Start",     step = 0.01, group = gSAR)
+sarInc   = input.float(0.02, "Increment", step = 0.01, group = gSAR)
+sarMax   = input.float(0.20, "Max",       step = 0.01, group = gSAR)
+// ----------------------------------------------------- support / resistance --
+gSR      = "Support / Resistance + Fib"
+pivLeft  = input.int(5, "Pivot left",  minval = 1, group = gSR)
+pivRight = input.int(5, "Pivot right", minval = 1, group = gSR)
+fibLook  = input.int(50, "Fibonacci swing lookback", minval = 10, group = gSR)
+// ------------------------------------------------------------- Heiken Ashi ---
 gHA     = "Heiken Ashi"
 haUpCol = input.color(color.white, "Up candle",   group = gHA)
 haDnCol = input.color(color.red,   "Down candle", group = gHA)
+// risk
+gR      = "Risk"
+atrLen  = input.int(14, "ATR length", minval = 1, group = gR)
 
 // =============================================================================
-// Indicator maths
+// Maths
 // =============================================================================
-atr  = ta.atr(atrLen)
-rng  = high - low
-body = math.abs(close - open)
-bodyR = rng > 0 ? body / rng : 0.0
+atr = ta.atr(atrLen)
 
 // ---- Heiken Ashi ----
 haClose = (open + high + low + close) / 4.0
@@ -87,12 +79,11 @@ haOpen := na(haOpen[1]) ? (open + close) / 2.0 : (haOpen[1] + haClose[1]) / 2.0
 haHigh  = math.max(high, math.max(haOpen, haClose))
 haLow   = math.min(low,  math.min(haOpen, haClose))
 haBull  = haClose >= haOpen
-
 plotcandle(showHA ? haOpen : na, showHA ? haHigh : na, showHA ? haLow : na, showHA ? haClose : na,
      title = "Heiken Ashi", color = haBull ? haUpCol : haDnCol,
      wickcolor = haBull ? haUpCol : haDnCol, bordercolor = haBull ? haUpCol : haDnCol)
 
-// ---- PCTrend (price-channel breakout trend; uses previous bar = no repaint) -
+// ---- PCTrend (price-channel breakout trend; previous bar = no repaint) ----
 upper = ta.highest(high, length)
 lower = ta.lowest(low,  length)
 var int trend = 0
@@ -111,98 +102,74 @@ trig    = ta.ema(ergodic, trigger)
 ergBull = ergodic > trig
 ergBear = ergodic < trig
 
-// ---- higher-timeframe trend context (EMA stack) ----
+// ---- Parabolic SAR ----
+psar    = ta.sar(sarStart, sarInc, sarMax)
+psarBull = close > psar
+psarBear = close < psar
+plot(showPSAR ? psar : na, "PSAR", style = plot.style_cross,
+     color = psarBull ? color.new(color.green, 0) : color.new(color.red, 0))
+
+// ---- EMA trend context ----
 emaFast = ta.ema(close, 20)
 emaSlow = ta.ema(close, 50)
 upCtx   = emaFast > emaSlow and close > emaSlow
 dnCtx   = emaFast < emaSlow and close < emaSlow
 
-// =============================================================================
-// (A) Range Contraction -> Breakout detection
-// =============================================================================
-// Box = the `boxBars` candles BEFORE the current (breakout) candle.
-boxHigh = ta.highest(high, boxBars)[1]
-boxLow  = ta.lowest(low,  boxBars)[1]
-boxHeight = boxHigh - boxLow
-
-// Average candle size in the box vs in the impulse window just before it.
-avgBoxRange = ta.sma(rng, boxBars)[1]
-avgBoxBody  = ta.sma(body, boxBars)[1]
-avgImpRange = ta.sma(rng, impLook)[boxBars + 1]
-avgImpBody  = ta.sma(body, impLook)[boxBars + 1]
-
-contracting = avgImpRange > 0 and avgBoxRange <= contractR * avgImpRange and avgBoxBody < avgImpBody and boxHeight <= maxBoxATR * atr
-
-// Institutional impulse (a full-body candle) somewhere in the impulse window.
-strongBull = (close > open and bodyR >= impBodyR) ? 1.0 : 0.0
-strongBear = (close < open and bodyR >= impBodyR) ? 1.0 : 0.0
-longImpulse  = ta.highest(strongBull, impLook)[boxBars + 1] >= 1
-shortImpulse = ta.highest(strongBear, impLook)[boxBars + 1] >= 1
-
-// Breakout candle (current bar, strong full body closing beyond the box).
-breakoutLong  = close > boxHigh * (1 + brkBuffer) and close > open and bodyR >= brkBodyR
-breakoutShort = close < boxLow  * (1 - brkBuffer) and close < open and bodyR >= brkBodyR
-
-// Pivot breaker (2nd entry): breakout that also clears the last confirmed pivot.
+// ---- Support / Resistance from swing pivots (confirmed = no repaint) ----
 ph = ta.pivothigh(high, pivLeft, pivRight)
 pl = ta.pivotlow(low,  pivLeft, pivRight)
-var float lastPH = na
-var float lastPL = na
-lastPH := na(ph) ? lastPH : ph
-lastPL := na(pl) ? lastPL : pl
-pivotBreakLong  = not na(lastPH) and close > lastPH
-pivotBreakShort = not na(lastPL) and close < lastPL
+var float resLvl = na
+var float supLvl = na
+resLvl := na(ph) ? resLvl : ph
+supLvl := na(pl) ? supLvl : pl
+plot(showSR ? resLvl : na, "Resistance", color = color.new(color.red, 30),  style = plot.style_stepline)
+plot(showSR ? supLvl : na, "Support",    color = color.new(color.green, 30), style = plot.style_stepline)
 
-// Raw setup signals.
-saBuyRaw  = contracting and breakoutLong  and longImpulse
-saSellRaw = contracting and breakoutShort and shortImpulse
+// ---- Fibonacci (auto, from rolling swing over fibLook) ----
+swH  = ta.highest(high, fibLook)
+swL  = ta.lowest(low,  fibLook)
+dif  = swH - swL
+fib382 = swH - 0.382 * dif
+fib500 = swH - 0.500 * dif
+fib618 = swH - 0.618 * dif
+plot(showFib ? fib382 : na, "Fib 0.382", color = color.new(color.teal, 40), style = plot.style_stepline)
+plot(showFib ? fib500 : na, "Fib 0.5",   color = color.new(color.teal, 20), style = plot.style_stepline)
+plot(showFib ? fib618 : na, "Fib 0.618", color = color.new(color.teal, 40), style = plot.style_stepline)
 
 // =============================================================================
-// Fuse engines + filters into final signals
+// QUALITY SIGNALS — fire only when required confirmations FIRST agree
 // =============================================================================
-// --- Engine 1: breakout (with confirmation + quality filters) ---------------
-notExhausted = not useExhaust or rng <= maxBrkATR * atr
-brkBuy  = useBreakout and saBuyRaw  and (not useTrend or trendUp) and (not useErg or ergBull) and (not useHA or haBull)     and (not useContext or upCtx) and notExhausted
-brkSell = useBreakout and saSellRaw and (not useTrend or trendDn) and (not useErg or ergBear) and (not useHA or not haBull) and (not useContext or dnCtx) and notExhausted
+bull = (not reqPCTrend or trendUp) and (not reqErgodic or ergBull) and (not reqPSAR or psarBull) and (not reqContext or upCtx) and (not reqHA or haBull)
+bear = (not reqPCTrend or trendDn) and (not reqErgodic or ergBear) and (not reqPSAR or psarBear) and (not reqContext or dnCtx) and (not reqHA or not haBull)
 
-// --- Engine 2: trend continuation (pullback resumes inside an aligned trend) -
-// Fires when PCTrend + EMA-context agree on direction and momentum turns back
-// that way (Ergodic cross OR Heiken-Ashi flip). Catches strong trends that
-// never contract, without chasing blow-off candles.
-ergCrossUp = ta.crossover(ergodic, trig)
-ergCrossDn = ta.crossunder(ergodic, trig)
-haTurnUp   = haBull and not haBull[1]
-haTurnDn   = not haBull and haBull[1]
-trendBuy  = useTrendPB and trendUp and upCtx and (ergCrossUp or haTurnUp)
-trendSell = useTrendPB and trendDn and dnCtx and (ergCrossDn or haTurnDn)
+buyTrigger  = bull and not bull[1]     // the bar alignment turns bullish
+sellTrigger = bear and not bear[1]
+gate = confirm ? barstate.isconfirmed : true
 
-// --- combine ---
-buyOK  = brkBuy  or trendBuy
-sellOK = brkSell or trendSell
-isBrkBuy  = brkBuy
-isBrkSell = brkSell
-gate   = confirm ? barstate.isconfirmed : true
-
-// Anti-whipsaw cooldown: no new signal within `cooldown` bars of the last one.
 var int lastSigBar = -1
 coolOK = lastSigBar < 0 or (bar_index - lastSigBar) >= cooldown
-buySig  = buyOK  and gate and coolOK and not sellOK
-sellSig = sellOK and gate and coolOK and not buyOK
+buySig  = buyTrigger  and gate and coolOK
+sellSig = sellTrigger and gate and coolOK
 if buySig or sellSig
     lastSigBar := bar_index
 
-buyLabel  = pivotBreakLong  ? "BUY 2nd"  : "BUY"
-sellLabel = pivotBreakShort ? "SELL 2nd" : "SELL"
-
 plotshape(showSig and buySig,  title = "BUY",  style = shape.labelup,
      location = location.belowbar, color = color.new(color.green, 0),
-     text = "BUY", textcolor = color.white, size = size.small)
+     text = "BUY", textcolor = color.white, size = size.normal)
 plotshape(showSig and sellSig, title = "SELL", style = shape.labeldown,
      location = location.abovebar, color = color.new(color.red, 0),
-     text = "SELL", textcolor = color.white, size = size.small)
+     text = "SELL", textcolor = color.white, size = size.normal)
+
+// ---- Trend-reversal markers (early warning: PSAR flips) ----
+psarFlipUp = psarBull and not psarBull[1]
+psarFlipDn = psarBear and not psarBear[1]
+plotshape(showRev and psarFlipUp, title = "Rev Up", style = shape.triangleup,
+     location = location.belowbar, color = color.new(color.lime, 0), size = size.tiny)
+plotshape(showRev and psarFlipDn, title = "Rev Dn", style = shape.triangledown,
+     location = location.abovebar, color = color.new(color.maroon, 0), size = size.tiny)
 
 // =============================================================================
-// Entry / Stop / Target levels (held until the next signal)
+// Entry / Stop / Targets — stop rides the Parabolic SAR (min 0.5*ATR away)
 // =============================================================================
 var float lvlEntry = na
 var float lvlStop  = na
@@ -211,20 +178,18 @@ var float lvlT2 = na
 var float lvlT3 = na
 if buySig
     lvlEntry := close
-    // breakout -> stop under the box; trend entry -> ATR stop (no box to use)
-    lvlStop  := isBrkBuy ? boxLow - 0.1 * atr : close - 1.5 * atr
-    r = lvlEntry - lvlStop
-    lvlT1 := lvlEntry + r
-    lvlT2 := lvlEntry + 2 * r
-    lvlT3 := lvlEntry + 3 * r
+    sd = math.max(close - psar, 0.5 * atr)
+    lvlStop := close - sd
+    lvlT1 := close + sd
+    lvlT2 := close + 2 * sd
+    lvlT3 := close + 3 * sd
 if sellSig
     lvlEntry := close
-    lvlStop  := isBrkSell ? boxHigh + 0.1 * atr : close + 1.5 * atr
-    r = lvlStop - lvlEntry
-    lvlT1 := lvlEntry - r
-    lvlT2 := lvlEntry - 2 * r
-    lvlT3 := lvlEntry - 3 * r
-
+    sd = math.max(psar - close, 0.5 * atr)
+    lvlStop := close + sd
+    lvlT1 := close - sd
+    lvlT2 := close - 2 * sd
+    lvlT3 := close - 3 * sd
 plot(showLevels ? lvlEntry : na, "Entry", color = color.new(color.blue, 0),  style = plot.style_linebr)
 plot(showLevels ? lvlStop  : na, "Stop",  color = color.new(color.red, 0),   style = plot.style_linebr)
 plot(showLevels ? lvlT1    : na, "T1",    color = color.new(color.green, 0),  style = plot.style_linebr)
@@ -237,22 +202,25 @@ plot(showLevels ? lvlT3    : na, "T3",    color = color.new(color.green, 60), st
 alertcondition(buySig,  title = "Naatai BUY",  message = "Naatai BUY {{ticker}} {{interval}} @ {{close}}")
 alertcondition(sellSig, title = "Naatai SELL", message = "Naatai SELL {{ticker}} {{interval}} @ {{close}}")
 if buySig
-    alert("Naatai " + buyLabel + " " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+    alert("Naatai BUY " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
 if sellSig
-    alert("Naatai " + sellLabel + " " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
+    alert("Naatai SELL " + syminfo.ticker + " @ " + str.tostring(close), alert.freq_once_per_bar_close)
 
 // =============================================================================
 // Status table
 // =============================================================================
-var table t = table.new(position.top_right, 2, 5, border_width = 1)
+var table t = table.new(position.top_right, 2, 6, border_width = 1)
 if showTable and barstate.islast
-    table.cell(t, 0, 0, "Trend", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 0, 0, "PCTrend", text_color = color.white, bgcolor = color.gray)
     table.cell(t, 1, 0, trendUp ? "UP" : trendDn ? "DOWN" : "FLAT", text_color = color.white, bgcolor = trendCol)
-    table.cell(t, 0, 1, "Heiken Ashi", text_color = color.white, bgcolor = color.gray)
-    table.cell(t, 1, 1, haBull ? "BULL" : "BEAR", text_color = color.white, bgcolor = haBull ? color.green : color.red)
-    table.cell(t, 0, 2, "Ergodic CCI", text_color = color.white, bgcolor = color.gray)
-    table.cell(t, 1, 2, ergBull ? "LONG" : ergBear ? "SHORT" : "NEUTRAL", text_color = color.white, bgcolor = ergBull ? color.green : ergBear ? color.red : color.gray)
-    table.cell(t, 0, 3, "Contraction", text_color = color.white, bgcolor = color.gray)
-    table.cell(t, 1, 3, contracting ? "YES" : "no", text_color = color.white, bgcolor = contracting ? color.green : color.new(color.gray, 40))
+    table.cell(t, 0, 1, "Ergodic CCI", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 1, ergBull ? "LONG" : ergBear ? "SHORT" : "NEUTRAL", text_color = color.white, bgcolor = ergBull ? color.green : ergBear ? color.red : color.gray)
+    table.cell(t, 0, 2, "Parabolic SAR", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 2, psarBull ? "UP" : "DOWN", text_color = color.white, bgcolor = psarBull ? color.green : color.red)
+    table.cell(t, 0, 3, "Heiken Ashi", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 3, haBull ? "BULL" : "BEAR", text_color = color.white, bgcolor = haBull ? color.green : color.red)
     table.cell(t, 0, 4, "Context", text_color = color.white, bgcolor = color.gray)
     table.cell(t, 1, 4, upCtx ? "UP" : dnCtx ? "DOWN" : "MIXED", text_color = color.white, bgcolor = upCtx ? color.green : dnCtx ? color.red : color.gray)
+    overallBias = bull ? "BUY ZONE" : bear ? "SELL ZONE" : "WAIT"
+    table.cell(t, 0, 5, "Bias", text_color = color.white, bgcolor = color.gray)
+    table.cell(t, 1, 5, overallBias, text_color = color.white, bgcolor = bull ? color.green : bear ? color.red : color.new(color.gray, 30))
