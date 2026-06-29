@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Bybit USDT-perpetual scanner.
+"""Crypto directional scanner (CoinGecko-backed).
 
-Pulls the full linear-perp universe from Bybit's public V5 API (no key needed,
-reachable from cloud/CI runners), analyses the liquid subset with real
-technical indicators, scores each pair BULL / BEAR / NEUTRAL with conviction,
-derives entry/stop/take-profit and a suggested holding time, and writes
-docs/data.json for the dashboard.
+Offshore derivatives exchanges (Binance, Bybit, OKX) block US/cloud IPs, and
+GitHub's hosted runners are US-based — so those APIs return 451/403 in CI.
+CoinGecko's public API is globally reachable, needs no key, and returns hundreds
+of coins WITH a 7-day hourly price history in a single call, which is enough to
+compute real trend/momentum signals, volatility-based stops, and an honest
+backtest hit-rate.
 
-Also runs a lightweight historical backtest of the signal logic so the
-dashboard can show an HONEST realised hit-rate (it will not be 100%).
+The output is a directional BULL / BEAR / NEUTRAL call per major coin. Direction
+is what matters for taking a long/short on the perpetual — spot and perp move
+together — so these signals are tradeable on your exchange of choice.
 
 Pure standard library: the GitHub Action stays dependency-free.
 """
@@ -22,38 +24,35 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Bybit public V5 hosts (no geo-block on cloud IPs). bytick is the mirror.
-BASES = ["https://api.bybit.com", "https://api.bytick.com"]
-
-TOP_N = 120                 # detailed analysis on the N most-liquid pairs
-MIN_QUOTE_VOL = 5_000_000   # skip pairs with < $5M 24h turnover (too illiquid)
+BASE = "https://api.coingecko.com/api/v3"
+PAGES = 2            # 250 coins/page -> top ~500 by volume
+PER_PAGE = 250
+MIN_VOL = 10_000_000  # skip coins with < $10M 24h volume
 OUT = Path(__file__).resolve().parents[1] / "docs" / "data.json"
 
 
-def _get(path: str, params: dict | None = None, retries: int = 3):
+def _get(path: str, params: dict | None = None, retries: int = 4):
     qs = ""
     if params:
         qs = "?" + "&".join(f"{k}={v}" for k, v in params.items())
+    url = BASE + path + qs
     last = None
-    for base in BASES:
-        url = base + path + qs
-        for attempt in range(retries):
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "naatai-scanner/1.0"})
-                with urllib.request.urlopen(req, timeout=25) as r:
-                    payload = json.loads(r.read().decode())
-                if payload.get("retCode") not in (0, None):
-                    raise RuntimeError(f"bybit retCode {payload.get('retCode')}: {payload.get('retMsg')}")
-                return payload
-            except urllib.error.HTTPError as e:
-                last = f"HTTP {e.code} on {url}"
-                if e.code in (403, 429):
-                    time.sleep(2 * (attempt + 1))
-                    continue
-            except Exception as e:  # noqa: BLE001
-                last = f"{type(e).__name__}: {e} on {url}"
-                time.sleep(1)
-    raise RuntimeError(f"request failed: {path} ({last})")
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "naatai-scanner/1.0",
+                                                       "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            last = f"HTTP {e.code}"
+            if e.code in (429, 503, 502):     # rate limited / transient
+                time.sleep(3 * (attempt + 1))
+                continue
+            time.sleep(1)
+        except Exception as e:  # noqa: BLE001
+            last = f"{type(e).__name__}: {e}"
+            time.sleep(2)
+    raise RuntimeError(f"request failed: {url} ({last})")
 
 
 def ema(values: list[float], period: int) -> list[float]:
@@ -85,152 +84,103 @@ def rsi(closes: list[float], period: int = 14) -> float:
     return 100 - (100 / (1 + rs))
 
 
-def fetch_klines(symbol: str, interval: str, limit: int) -> list[list[float]]:
-    """Return klines oldest->newest as [open,high,low,close] float rows.
-
-    Bybit kline row: [start, open, high, low, close, volume, turnover]; the
-    list is returned newest-first, so we reverse it.
-    """
-    payload = _get("/v5/market/kline",
-                   {"category": "linear", "symbol": symbol, "interval": interval, "limit": limit})
-    rows = payload["result"]["list"]
-    rows = list(reversed(rows))
-    return [[float(r[1]), float(r[2]), float(r[3]), float(r[4])] for r in rows]
+def stdev_returns(closes: list[float]) -> float:
+    rets = [(closes[i] - closes[i - 1]) / closes[i - 1]
+            for i in range(1, len(closes)) if closes[i - 1]]
+    if len(rets) < 2:
+        return 0.01
+    m = sum(rets) / len(rets)
+    var = sum((x - m) ** 2 for x in rets) / (len(rets) - 1)
+    return var ** 0.5
 
 
-def closes_of(klines: list[list[float]]) -> list[float]:
-    return [r[3] for r in klines]
-
-
-def atr_pct(klines: list[list[float]], period: int = 14) -> float:
-    trs = []
-    for i in range(1, len(klines)):
-        h, l, pc = klines[i][1], klines[i][2], klines[i - 1][3]
-        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
-    if not trs:
-        return 0.0
-    window = trs[-period:]
-    atr = sum(window) / len(window)
-    last_close = klines[-1][3]
-    return atr / last_close if last_close else 0.0
-
-
-def score_pair(k4h, k1h, chg24h: float, funding: float) -> dict:
-    c4 = closes_of(k4h)
-    c1 = closes_of(k1h)
-    e20, e50 = ema(c4, 20), ema(c4, 50)
-    price = c4[-1]
-
-    if e20[-1] > e50[-1]:
-        trend = min(1.0, (e20[-1] - e50[-1]) / price * 40)
-    else:
-        trend = max(-1.0, (e20[-1] - e50[-1]) / price * 40)
-
-    r = rsi(c1, 14)
-    momentum = (r - 50) / 50.0
-    above = 1.0 if price > e20[-1] else -1.0
-    chg = max(-1.0, min(1.0, chg24h / 8.0))
-    fund = max(-1.0, min(1.0, -funding * 1000))
-
-    score = (0.42 * trend + 0.28 * momentum + 0.12 * above + 0.12 * chg + 0.06 * fund)
-    score = max(-1.0, min(1.0, score))
-
-    if abs(momentum) > abs(trend):
-        sig_tf, hold = "1h", "6-12 hours"
-    else:
-        sig_tf, hold = "4h", "~2 days"
-
-    return {"score": score, "rsi": r, "price": price, "atr_pct": atr_pct(k4h),
-            "signal_tf": sig_tf, "hold": hold}
-
-
-def backtest_hitrate(k4h, horizon: int = 12) -> tuple[int, int]:
-    c = closes_of(k4h)
-    e20, e50 = ema(c, 20), ema(c, 50)
+def backtest_hitrate(closes: list[float], horizon: int = 24) -> tuple[int, int]:
+    """Hourly sparkline: when EMA20>EMA50 (bull), was price `horizon` hours
+    later higher? Aggregate correct/total."""
+    if len(closes) < 60 + horizon:
+        return 0, 0
+    e20, e50 = ema(closes, 20), ema(closes, 50)
     correct = total = 0
-    for i in range(50, len(c) - horizon):
+    for i in range(50, len(closes) - horizon):
         bull = e20[i] > e50[i]
-        moved_up = c[i + horizon] > c[i]
+        up = closes[i + horizon] > closes[i]
         total += 1
-        if bull == moved_up:
+        if bull == up:
             correct += 1
     return correct, total
 
 
-def fetch_universe():
-    """Return (symbols set, ticker dict by symbol)."""
-    symbols = set()
-    cursor = ""
-    while True:
-        params = {"category": "linear", "limit": 1000}
-        if cursor:
-            params["cursor"] = cursor
-        payload = _get("/v5/market/instruments-info", params)
-        for it in payload["result"]["list"]:
-            if (it.get("contractType") == "LinearPerpetual"
-                    and it.get("quoteCoin") == "USDT"
-                    and it.get("status") == "Trading"):
-                symbols.add(it["symbol"])
-        cursor = payload["result"].get("nextPageCursor") or ""
-        if not cursor:
-            break
+def score(spark: list[float], c1h: float, c24h: float, c7d: float) -> dict:
+    e20, e50 = ema(spark, 20), ema(spark, 50)
+    price = spark[-1]
+    if e20[-1] > e50[-1]:
+        trend = min(1.0, (e20[-1] - e50[-1]) / price * 50)
+    else:
+        trend = max(-1.0, (e20[-1] - e50[-1]) / price * 50)
 
-    tickers = {}
-    payload = _get("/v5/market/tickers", {"category": "linear"})
-    for t in payload["result"]["list"]:
-        tickers[t["symbol"]] = t
-    return symbols, tickers
+    mom1h = max(-1.0, min(1.0, c1h / 3.0))
+    mom24 = max(-1.0, min(1.0, c24h / 8.0))
+    mom7d = max(-1.0, min(1.0, c7d / 25.0))
+    r = rsi(spark, 14)
+
+    s = 0.34 * trend + 0.18 * mom1h + 0.26 * mom24 + 0.22 * mom7d
+    s = max(-1.0, min(1.0, s))
+
+    # Which horizon is driving the call -> suggested holding time.
+    drivers = {"1h": abs(mom1h), "4h": abs(trend) + abs(mom24), "1d": abs(mom7d)}
+    tf = max(drivers, key=drivers.get)
+    hold = {"1h": "6-12 hours", "4h": "~2 days", "1d": "several days - 1 week"}[tf]
+    return {"score": s, "rsi": r, "price": price, "tf": tf, "hold": hold,
+            "vol": max(stdev_returns(spark), 0.004)}
 
 
 def main() -> None:
-    print("Fetching Bybit universe + tickers ...")
-    symbols, tickers = fetch_universe()
-    universe_total = len(symbols)
-
-    rows = []
-    for sym in symbols:
-        t = tickers.get(sym)
-        if not t:
-            continue
-        qv = float(t.get("turnover24h", 0) or 0)
-        if qv >= MIN_QUOTE_VOL:
-            rows.append((sym, qv, t))
-    rows.sort(key=lambda x: x[1], reverse=True)
-    rows = rows[:TOP_N]
-    print(f"{universe_total} linear perps; analysing top {len(rows)} by 24h turnover.")
+    print("Fetching CoinGecko markets (with 7d hourly sparkline) ...")
+    coins = []
+    for page in range(1, PAGES + 1):
+        batch = _get("/coins/markets", {
+            "vs_currency": "usd", "order": "volume_desc",
+            "per_page": PER_PAGE, "page": page, "sparkline": "true",
+            "price_change_percentage": "1h,24h,7d",
+        })
+        coins.extend(batch)
+        time.sleep(1.5)
+    print(f"Fetched {len(coins)} coins.")
 
     signals = []
     hit_c = hit_t = 0
-    for sym, _qv, t in rows:
+    for c in coins:
         try:
-            k4h = fetch_klines(sym, "240", 200)
-            k1h = fetch_klines(sym, "60", 120)
-            if len(k4h) < 60 or len(k1h) < 30:
+            vol = float(c.get("total_volume") or 0)
+            spark = ((c.get("sparkline_in_7d") or {}).get("price")) or []
+            if vol < MIN_VOL or len(spark) < 80:
                 continue
-            chg = float(t.get("price24hPcnt", 0) or 0) * 100      # fraction -> percent
-            funding = float(t.get("fundingRate", 0) or 0)
-            sc = score_pair(k4h, k1h, chg, funding)
+            c1h = float(c.get("price_change_percentage_1h_in_currency") or 0)
+            c24 = float(c.get("price_change_percentage_24h_in_currency") or 0)
+            c7d = float(c.get("price_change_percentage_7d_in_currency") or 0)
+            sc = score(spark, c1h, c24, c7d)
 
-            c, tot = backtest_hitrate(k4h)
-            hit_c += c
-            hit_t += tot
+            hc, ht = backtest_hitrate(spark)
+            hit_c += hc
+            hit_t += ht
 
             s = sc["score"]
             direction = "BULL" if s > 0.15 else "BEAR" if s < -0.15 else "NEUTRAL"
             conviction = round(min(0.95, abs(s) * 1.1 + 0.05), 3)
-            price = sc["price"]
-            vol = max(sc["atr_pct"], 0.004)
+            price = float(c.get("current_price") or sc["price"])
+            v = sc["vol"]
             if direction == "BULL":
-                stop = price * (1 - 2 * vol); tp = price * (1 + 4 * vol)
+                stop = price * (1 - 3 * v); tp = price * (1 + 6 * v)
             elif direction == "BEAR":
-                stop = price * (1 + 2 * vol); tp = price * (1 - 4 * vol)
+                stop = price * (1 + 3 * v); tp = price * (1 - 6 * v)
             else:
                 stop = tp = 0.0
 
             signals.append({
-                "symbol": sym.replace("USDT", "-USDT") + ".P",
+                "symbol": c["symbol"].upper() + "-USDT.P",
+                "name": c.get("name", ""),
                 "price": round(price, 6),
-                "signal_tf": sc["signal_tf"],
+                "signal_tf": sc["tf"],
                 "direction": direction,
                 "confidence": conviction,
                 "hold": sc["hold"] if direction != "NEUTRAL" else "-",
@@ -238,13 +188,11 @@ def main() -> None:
                 "stop": round(stop, 6),
                 "take_profit": round(tp, 6),
                 "rsi": round(sc["rsi"], 1),
-                "chg24h": round(chg, 2),
-                "vol_pct": round(vol * 100, 2),
-                "funding": round(funding * 100, 4),
+                "chg24h": round(c24, 2),
+                "vol_pct": round(v * 100, 2),
             })
-            time.sleep(0.04)
         except Exception as e:  # noqa: BLE001
-            print(f"  skip {sym}: {e}")
+            print(f"  skip {c.get('id')}: {e}")
 
     signals.sort(key=lambda x: (x["direction"] == "NEUTRAL", -x["confidence"]))
     hit_rate = round(100 * hit_c / hit_t, 1) if hit_t else None
@@ -253,18 +201,18 @@ def main() -> None:
         "meta": {
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "mode": "LIVE",
-            "source": "Bybit USDT Perpetual Futures (public V5 API)",
-            "market_type": "Perpetual Futures",
-            "universe_total": universe_total,
+            "source": "CoinGecko (top coins by volume; spot reference, tradeable as perps)",
+            "market_type": "Crypto — directional (long/short)",
+            "universe_total": len(coins),
             "analysed": len(signals),
             "backtest": {
                 "hit_rate_pct": hit_rate,
                 "samples": hit_t,
-                "method": "4h EMA20/50 trend vs price 12 bars (~2 days) later, across analysed universe",
+                "method": "Hourly EMA20/50 trend vs price 24h later, across analysed coins (last 7d)",
             },
-            "note": "Rules-based technical screen. NOT financial advice. No signal is 100% accurate; "
-                    "futures use leverage and can lose more than your margin. Paper-trade and verify the "
-                    "hit-rate before risking real money.",
+            "note": "Rules-based technical screen on live market data. NOT financial advice. No signal is "
+                    "100% accurate; perps use leverage and can lose more than your margin. Paper-trade and "
+                    "verify the hit-rate before risking real money.",
         },
         "timeframe_map": [
             {"tf": "15m", "hold": "1-3 hours"},
