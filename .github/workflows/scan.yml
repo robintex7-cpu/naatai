@@ -1,4 +1,4 @@
-name: Scan Binance Perps
+name: Scan Crypto Signals
 
 on:
   schedule:
