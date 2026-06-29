@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naatai"
+version = "0.0.1"
+description = "Modular, AI-driven trading system (data lake -> features -> models -> ensemble -> risk -> execution)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    # Runtime deps are intentionally minimal in the scaffold. Add as stages
+    # are implemented, e.g. numpy / pandas / scikit-learn / ccxt.
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

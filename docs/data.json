@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "generated_at": "2026-06-29T21:55:00Z",
+    "mode": "DEMO",
+    "note": "Illustrative data. Models are stubs; these are not real trading signals.",
+    "horizon": "1h"
+  },
+  "regime": {
+    "label": "bull",
+    "confidence": 0.71,
+    "probabilities": { "bull": 0.71, "chop": 0.18, "high_vol": 0.08, "bear": 0.03 }
+  },
+  "symbols": [
+    {
+      "symbol": "BTC-USD",
+      "price": 71240.5,
+      "models": [
+        { "name": "price",      "direction":  0.42, "confidence": 0.68 },
+        { "name": "order_book", "direction":  0.15, "confidence": 0.55 },
+        { "name": "macro",      "direction":  0.30, "confidence": 0.61 }
+      ],
+      "ensemble": { "p_up": 0.64, "expected_return": 0.0085 },
+      "decision": { "action": "TAKE TRADE", "side": "BUY", "size_usd": 12000, "max_loss_usd": 2000, "rationale": "Edge > threshold; bull regime; models aligned long." }
+    },
+    {
+      "symbol": "ETH-USD",
+      "price": 3815.2,
+      "models": [
+        { "name": "price",      "direction": -0.05, "confidence": 0.40 },
+        { "name": "order_book", "direction":  0.08, "confidence": 0.52 },
+        { "name": "macro",      "direction":  0.02, "confidence": 0.33 }
+      ],
+      "ensemble": { "p_up": 0.52, "expected_return": 0.0011 },
+      "decision": { "action": "NO TRADE", "side": "FLAT", "size_usd": 0, "max_loss_usd": 0, "rationale": "Edge below threshold; models disagree; not worth the risk." }
+    }
+  ],
+  "pipeline": [
+    { "stage": "Data Lake",          "status": "stub" },
+    { "stage": "Feature Engineering","status": "stub" },
+    { "stage": "Regime Detection",   "status": "stub" },
+    { "stage": "Models",             "status": "stub" },
+    { "stage": "Ensemble",           "status": "stub" },
+    { "stage": "Risk Management",     "status": "stub" },
+    { "stage": "Execution",          "status": "stub" },
+    { "stage": "Monitoring",         "status": "stub" },
+    { "stage": "Retraining",         "status": "stub" }
+  ]
+}
