@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"   # every 15 minutes
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "docs/data.json"     # don't re-trigger on the scanner's own commit
 
 permissions:
   contents: write
