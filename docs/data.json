@@ -1,48 +1,29 @@
 {
   "meta": {
-    "generated_at": "2026-06-29T21:55:00Z",
+    "generated_at": "2026-06-29T22:20:00Z",
     "mode": "DEMO",
-    "note": "Illustrative data. Models are stubs; these are not real trading signals.",
-    "horizon": "1h"
+    "market_type": "Perpetual Futures",
+    "note": "Illustrative data. Models are stubs; these are NOT real trading signals and no signal is ever 100% accurate."
   },
   "regime": {
     "label": "bull",
-    "confidence": 0.71,
-    "probabilities": { "bull": 0.71, "chop": 0.18, "high_vol": 0.08, "bear": 0.03 }
+    "confidence": 0.69,
+    "probabilities": { "bull": 0.69, "chop": 0.19, "high_vol": 0.09, "bear": 0.03 }
   },
-  "symbols": [
-    {
-      "symbol": "BTC-USD",
-      "price": 71240.5,
-      "models": [
-        { "name": "price",      "direction":  0.42, "confidence": 0.68 },
-        { "name": "order_book", "direction":  0.15, "confidence": 0.55 },
-        { "name": "macro",      "direction":  0.30, "confidence": 0.61 }
-      ],
-      "ensemble": { "p_up": 0.64, "expected_return": 0.0085 },
-      "decision": { "action": "TAKE TRADE", "side": "BUY", "size_usd": 12000, "max_loss_usd": 2000, "rationale": "Edge > threshold; bull regime; models aligned long." }
-    },
-    {
-      "symbol": "ETH-USD",
-      "price": 3815.2,
-      "models": [
-        { "name": "price",      "direction": -0.05, "confidence": 0.40 },
-        { "name": "order_book", "direction":  0.08, "confidence": 0.52 },
-        { "name": "macro",      "direction":  0.02, "confidence": 0.33 }
-      ],
-      "ensemble": { "p_up": 0.52, "expected_return": 0.0011 },
-      "decision": { "action": "NO TRADE", "side": "FLAT", "size_usd": 0, "max_loss_usd": 0, "rationale": "Edge below threshold; models disagree; not worth the risk." }
-    }
+  "timeframe_map": [
+    { "tf": "15m", "hold": "1–3 hours" },
+    { "tf": "1h",  "hold": "6–12 hours" },
+    { "tf": "4h",  "hold": "~2 days" },
+    { "tf": "1d",  "hold": "several days – 1 week" }
   ],
-  "pipeline": [
-    { "stage": "Data Lake",          "status": "stub" },
-    { "stage": "Feature Engineering","status": "stub" },
-    { "stage": "Regime Detection",   "status": "stub" },
-    { "stage": "Models",             "status": "stub" },
-    { "stage": "Ensemble",           "status": "stub" },
-    { "stage": "Risk Management",     "status": "stub" },
-    { "stage": "Execution",          "status": "stub" },
-    { "stage": "Monitoring",         "status": "stub" },
-    { "stage": "Retraining",         "status": "stub" }
+  "signals": [
+    { "symbol": "BTC-USDT.P", "price": 71240.5, "signal_tf": "4h",  "direction": "LONG",     "confidence": 0.86, "hold": "~2 days",            "entry": 71240, "stop": 69100, "take_profit": 75800, "leverage": "3x", "rationale": "Bull regime; price + macro aligned long; 4H trend intact." },
+    { "symbol": "SOL-USDT.P", "price": 188.42, "signal_tf": "1h",  "direction": "LONG",     "confidence": 0.81, "hold": "6–12 hours",   "entry": 188.4, "stop": 181.0, "take_profit": 203.5, "leverage": "3x", "rationale": "Strong momentum + positive net inflows on 1H." },
+    { "symbol": "XRP-USDT.P", "price": 2.41,   "signal_tf": "4h",  "direction": "SHORT",    "confidence": 0.78, "hold": "~2 days",            "entry": 2.41,  "stop": 2.56,  "take_profit": 2.08,  "leverage": "2x", "rationale": "Lower-highs on 4H; weakening order-book bid; macro headwind." },
+    { "symbol": "DOGE-USDT.P","price": 0.162,  "signal_tf": "15m", "direction": "SHORT",    "confidence": 0.74, "hold": "1–3 hours",    "entry": 0.162, "stop": 0.169, "take_profit": 0.150, "leverage": "2x", "rationale": "Short-term exhaustion; sell pressure in 15m order book." },
+    { "symbol": "ETH-USDT.P", "price": 3815.2, "signal_tf": "1d",  "direction": "LONG",     "confidence": 0.68, "hold": "several days",       "entry": 3815,  "stop": 3560,  "take_profit": 4350,  "leverage": "2x", "rationale": "Daily base building; constructive but lower conviction." },
+    { "symbol": "BNB-USDT.P", "price": 612.7,  "signal_tf": "4h",  "direction": "LONG",     "confidence": 0.61, "hold": "~2 days",            "entry": 612.7, "stop": 592.0, "take_profit": 655.0, "leverage": "2x", "rationale": "Mild uptrend; models partially aligned." },
+    { "symbol": "AVAX-USDT.P","price": 41.85,  "signal_tf": "1h",  "direction": "NO TRADE", "confidence": 0.44, "hold": "—",            "entry": 0,     "stop": 0,     "take_profit": 0,     "leverage": "—", "rationale": "Models disagree; conviction below threshold — stay out." },
+    { "symbol": "ADA-USDT.P", "price": 0.612,  "signal_tf": "15m", "direction": "NO TRADE", "confidence": 0.39, "hold": "—",            "entry": 0,     "stop": 0,     "take_profit": 0,     "leverage": "—", "rationale": "Choppy 15m; no clean edge." }
   ]
 }

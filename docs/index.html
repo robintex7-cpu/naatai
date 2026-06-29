@@ -3,154 +3,139 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>naatai · Trading Dashboard</title>
+<title>naatai · Perp Signals</title>
 <style>
   :root {
-    --bg: #0b0e14; --panel: #131823; --panel2: #1a2030; --line: #232b3a;
-    --text: #e6edf3; --muted: #8b98a9; --green: #2ecc71; --red: #ff5c5c;
-    --amber: #f5a623; --blue: #4d9fff; --accent: #6c5ce7;
+    --bg:#0b0e14; --panel:#131823; --panel2:#1a2030; --line:#232b3a;
+    --text:#e6edf3; --muted:#8b98a9; --green:#2ecc71; --red:#ff5c5c;
+    --amber:#f5a623; --blue:#4d9fff; --accent:#6c5ce7;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 18px 60px; }
-  header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-  .brand { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
-  .brand span { color: var(--accent); }
-  .demo-banner {
-    margin: 18px 0; padding: 10px 14px; border-radius: 10px;
-    background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.4);
-    color: var(--amber); font-size: 13.5px;
-  }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
-  }
-  .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-  .regime-badge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-  .bar { height: 8px; border-radius: 999px; background: var(--panel2); overflow: hidden; margin: 6px 0 12px; }
-  .bar > i { display: block; height: 100%; }
-  .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-  .sym-card { margin-top: 16px; }
-  .sym-head { display: flex; align-items: baseline; justify-content: space-between; }
-  .sym-name { font-size: 20px; font-weight: 700; }
-  .sym-price { color: var(--muted); }
-  .decision { display: flex; align-items: center; gap: 12px; margin: 14px 0; padding: 14px; border-radius: 12px; }
-  .decision.go { background: rgba(46,204,113,.10); border: 1px solid rgba(46,204,113,.4); }
-  .decision.no { background: rgba(255,92,92,.08); border: 1px solid rgba(255,92,92,.35); }
-  .decision .big { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
-  .models { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  .models th, .models td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .models th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
-  .num { font-variant-numeric: tabular-nums; }
-  .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
-  .kv { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed var(--line); }
-  .kv:last-child { border-bottom: 0; }
-  .kv .k { color: var(--muted); }
-  .pipeline { display: flex; flex-wrap: wrap; gap: 8px; }
-  .stage { padding: 7px 11px; border-radius: 9px; background: var(--panel2); border: 1px solid var(--line); font-size: 12.5px; }
-  .stage .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--amber); }
-  .rationale { color: var(--muted); font-size: 13px; margin-top: 4px; }
-  footer { margin-top: 30px; color: var(--muted); font-size: 12.5px; text-align: center; }
-  a { color: var(--blue); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:1140px; margin:0 auto; padding:22px 16px 70px; }
+  header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  .brand { font-size:25px; font-weight:800; letter-spacing:.4px; }
+  .brand span { color:var(--accent); }
+  .sub { color:var(--muted); font-size:13px; }
+  .banner { margin:16px 0; padding:10px 14px; border-radius:10px;
+    background:rgba(245,166,35,.12); border:1px solid rgba(245,166,35,.4); color:var(--amber); font-size:13px; }
+  .topbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+  .chip { padding:6px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); font-size:12.5px; color:var(--muted); }
+  .chip b { color:var(--text); }
+  .regime-badge { padding:5px 12px; border-radius:999px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; font-size:12.5px; }
+  .tf-table { width:100%; border-collapse:collapse; margin:6px 0 18px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .tf-table th, .tf-table td { padding:8px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--line); }
+  .tf-table th { color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
+  .tf-table tr:last-child td { border-bottom:0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; position:relative; }
+  .card.long  { border-left:4px solid var(--green); }
+  .card.short { border-left:4px solid var(--red); }
+  .card.no    { border-left:4px solid var(--muted); opacity:.82; }
+  .rank { position:absolute; top:14px; right:14px; font-size:11px; color:var(--muted); }
+  .sym { font-size:18px; font-weight:800; }
+  .px { color:var(--muted); font-size:13px; }
+  .dir { display:inline-block; margin:10px 0 8px; padding:7px 14px; border-radius:9px; font-weight:800; font-size:16px; letter-spacing:.5px; }
+  .dir.long  { background:rgba(46,204,113,.14); color:var(--green); }
+  .dir.short { background:rgba(255,92,92,.14); color:var(--red); }
+  .dir.no    { background:rgba(139,152,169,.14); color:var(--muted); }
+  .lev { font-size:12px; color:var(--muted); margin-left:8px; }
+  .bar { height:7px; border-radius:999px; background:var(--panel2); overflow:hidden; margin:4px 0 10px; }
+  .bar > i { display:block; height:100%; }
+  .kv { display:flex; justify-content:space-between; padding:4px 0; font-size:13.5px; border-bottom:1px dashed var(--line); }
+  .kv:last-of-type { border-bottom:0; }
+  .kv .k { color:var(--muted); }
+  .num { font-variant-numeric:tabular-nums; }
+  .tag { display:inline-block; padding:3px 9px; border-radius:7px; background:var(--panel2); border:1px solid var(--line); font-size:11.5px; color:var(--blue); }
+  .hold { color:var(--amber); font-weight:700; }
+  .rat { color:var(--muted); font-size:12.5px; margin-top:8px; }
+  h2.sec { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:6px 0 8px; }
+  footer { margin-top:28px; color:var(--muted); font-size:12px; text-align:center; }
+  a { color:var(--blue); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">naat<span>ai</span> · trading dashboard</div>
-    <div id="asof" class="sym-price"></div>
+    <div>
+      <div class="brand">naat<span>ai</span> · perp signals</div>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div id="regimeBadge"></div>
   </header>
 
-  <div class="demo-banner" id="banner">Loading…</div>
+  <div class="banner" id="banner">Loading…</div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>Market Regime</h2>
-      <div id="regime"></div>
-    </div>
-    <div class="card">
-      <h2>Pipeline Status</h2>
-      <div class="pipeline" id="pipeline"></div>
-      <div class="rationale" style="margin-top:10px">Each stage is wired and tested. Amber = stub awaiting implementation; turns green once real logic is added.</div>
-    </div>
-  </div>
+  <div class="topbar" id="topbar"></div>
 
-  <div id="symbols"></div>
+  <h2 class="sec">How long to hold (by signal timeframe)</h2>
+  <table class="tf-table" id="tfTable"><tbody></tbody></table>
+
+  <h2 class="sec">Signals — ranked by conviction</h2>
+  <div class="grid" id="grid"></div>
 
   <footer>
     naatai — modular AI trading system ·
-    <a href="https://github.com/robintex7-cpu/naatai" target="_blank" rel="noopener">source on GitHub</a><br/>
-    Demo dashboard. Not investment advice. No live trading is performed.
+    <a href="https://github.com/robintex7-cpu/naatai" target="_blank" rel="noopener">source</a><br/>
+    DEMO interface. Educational only — not financial advice. No signal is 100% accurate; trade your own risk.
   </footer>
 </div>
 
 <script>
-const regimeColors = { bull: "#2ecc71", bear: "#ff5c5c", chop: "#f5a623", high_vol: "#4d9fff", crisis: "#ff5c5c", unknown: "#8b98a9" };
-const fmtPct = x => (x*100).toFixed(1) + "%";
-const fmtSignedPct = x => (x>=0?"+":"") + (x*100).toFixed(2) + "%";
-const fmtUsd = x => "$" + Number(x).toLocaleString("en-US");
-const dirClass = x => x > 0.001 ? "up" : (x < -0.001 ? "down" : "flat");
+const regimeColors = { bull:"#2ecc71", bear:"#ff5c5c", chop:"#f5a623", high_vol:"#4d9fff", crisis:"#ff5c5c", unknown:"#8b98a9" };
+const pct = x => (x*100).toFixed(0) + "%";
+const usd = x => "$" + Number(x).toLocaleString("en-US", { maximumFractionDigits: x < 10 ? 4 : 2 });
 
 function render(d) {
-  document.getElementById("asof").textContent = "as of " + new Date(d.meta.generated_at).toLocaleString();
-  document.getElementById("banner").textContent =
-    "● " + d.meta.mode + " MODE — " + d.meta.note + " Horizon: " + d.meta.horizon + ".";
+  document.getElementById("sub").textContent =
+    d.meta.market_type + " · updated " + new Date(d.meta.generated_at).toLocaleString();
+  document.getElementById("banner").textContent = "● " + d.meta.mode + " MODE — " + d.meta.note;
 
-  // Regime
   const r = d.regime, rc = regimeColors[r.label] || "#8b98a9";
-  let rh = `<span class="regime-badge" style="background:${rc}22;color:${rc};border:1px solid ${rc}66">${r.label}</span>
-            <span style="margin-left:10px;color:var(--muted)">confidence ${fmtPct(r.confidence)}</span><div style="margin-top:12px">`;
-  for (const [k,v] of Object.entries(r.probabilities)) {
-    const c = regimeColors[k] || "#8b98a9";
-    rh += `<div class="kv"><span class="k">${k}</span><span class="num">${fmtPct(v)}</span></div>
-           <div class="bar"><i style="width:${v*100}%;background:${c}"></i></div>`;
-  }
-  document.getElementById("regime").innerHTML = rh + "</div>";
+  document.getElementById("regimeBadge").innerHTML =
+    `<span class="regime-badge" style="background:${rc}22;color:${rc};border:1px solid ${rc}66">REGIME: ${r.label} ${pct(r.confidence)}</span>`;
 
-  // Pipeline
-  document.getElementById("pipeline").innerHTML = d.pipeline.map(s =>
-    `<div class="stage"><span class="dot"></span>${s.stage}</div>`).join("");
+  const longs  = d.signals.filter(s => s.direction === "LONG").length;
+  const shorts = d.signals.filter(s => s.direction === "SHORT").length;
+  const flats  = d.signals.filter(s => s.direction === "NO TRADE").length;
+  document.getElementById("topbar").innerHTML =
+    `<span class="chip">Coins: <b>${d.signals.length}</b></span>
+     <span class="chip" style="color:var(--green)">Long: <b>${longs}</b></span>
+     <span class="chip" style="color:var(--red)">Short: <b>${shorts}</b></span>
+     <span class="chip">No-trade: <b>${flats}</b></span>`;
 
-  // Symbols
-  document.getElementById("symbols").innerHTML = d.symbols.map(s => {
-    const go = s.decision.action === "TAKE TRADE";
-    const rows = s.models.map(m => `
-      <tr><td>${m.name}</td>
-          <td class="num ${dirClass(m.direction)}">${fmtSignedPct(m.direction/10)}</td>
-          <td class="num">${fmtPct(m.confidence)}</td></tr>`).join("");
+  document.querySelector("#tfTable tbody").innerHTML =
+    `<tr><th>Chart timeframe</th><th>Suggested holding time</th></tr>` +
+    d.timeframe_map.map(t => `<tr><td><span class="tag">${t.tf}</span></td><td class="hold">${t.hold}</td></tr>`).join("");
+
+  const order = { "LONG":2, "SHORT":2, "NO TRADE":0 };
+  const sorted = [...d.signals].sort((a,b) =>
+    (order[b.direction]-order[a.direction]) || (b.confidence-a.confidence));
+
+  document.getElementById("grid").innerHTML = sorted.map((s,i) => {
+    const cls = s.direction === "LONG" ? "long" : s.direction === "SHORT" ? "short" : "no";
+    const convColor = s.confidence >= 0.8 ? "var(--green)" : s.confidence >= 0.6 ? "var(--amber)" : "var(--muted)";
+    const trade = s.direction !== "NO TRADE";
     return `
-    <div class="card sym-card">
-      <div class="sym-head">
-        <div class="sym-name">${s.symbol}</div>
-        <div class="sym-price num">${fmtUsd(s.price)}</div>
+    <div class="card ${cls}">
+      <div class="rank">#${i+1}</div>
+      <div class="sym">${s.symbol}</div>
+      <div class="px num">${usd(s.price)}</div>
+      <div>
+        <span class="dir ${cls}">${s.direction}</span>
+        ${trade ? `<span class="lev">${s.leverage}</span>` : ""}
       </div>
-      <div class="decision ${go ? "go":"no"}">
-        <div class="big ${go ? "up":"down"}">${s.decision.action}</div>
-        <div>
-          <span class="pill" style="background:${go?"#2ecc7122":"#ff5c5c22"};color:${go?"#2ecc71":"#ff5c5c"}">${s.decision.side}</span>
-          ${go ? `<span style="margin-left:8px">size ${fmtUsd(s.decision.size_usd)} · risk cap ${fmtUsd(s.decision.max_loss_usd)}</span>` : ""}
-          <div class="rationale">${s.decision.rationale}</div>
-        </div>
-      </div>
-      <div class="grid">
-        <div>
-          <h2 style="color:var(--muted)">Model Forecasts</h2>
-          <table class="models">
-            <tr><th>model</th><th>signal</th><th>conf.</th></tr>
-            ${rows}
-          </table>
-        </div>
-        <div>
-          <h2 style="color:var(--muted)">Ensemble</h2>
-          <div class="kv"><span class="k">P(up)</span><span class="num">${fmtPct(s.ensemble.p_up)}</span></div>
-          <div class="bar"><i style="width:${s.ensemble.p_up*100}%;background:${s.ensemble.p_up>=0.5?"#2ecc71":"#ff5c5c"}"></i></div>
-          <div class="kv"><span class="k">Expected return (${d.meta.horizon})</span><span class="num ${dirClass(s.ensemble.expected_return)}">${fmtSignedPct(s.ensemble.expected_return)}</span></div>
-        </div>
-      </div>
+      <div class="kv"><span class="k">Conviction</span><span class="num" style="color:${convColor};font-weight:700">${pct(s.confidence)}</span></div>
+      <div class="bar"><i style="width:${s.confidence*100}%;background:${convColor}"></i></div>
+      <div class="kv"><span class="k">Signal timeframe</span><span><span class="tag">${s.signal_tf}</span></span></div>
+      <div class="kv"><span class="k">Hold for</span><span class="hold">${s.hold}</span></div>
+      ${trade ? `
+        <div class="kv"><span class="k">Entry</span><span class="num">${usd(s.entry)}</span></div>
+        <div class="kv"><span class="k">Stop loss</span><span class="num" style="color:var(--red)">${usd(s.stop)}</span></div>
+        <div class="kv"><span class="k">Take profit</span><span class="num" style="color:var(--green)">${usd(s.take_profit)}</span></div>
+      ` : ""}
+      <div class="rat">${s.rationale}</div>
     </div>`;
   }).join("");
 }
