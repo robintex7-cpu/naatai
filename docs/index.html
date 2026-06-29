@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>naatai · Perp Signals</title>
+<title>naatai · Binance Perp Scanner</title>
 <style>
   :root {
     --bg:#0b0e14; --panel:#131823; --panel2:#1a2030; --line:#232b3a;
@@ -13,45 +13,47 @@
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text);
     font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  .wrap { max-width:1140px; margin:0 auto; padding:22px 16px 70px; }
+  .wrap { max-width:1160px; margin:0 auto; padding:22px 16px 70px; }
   header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
   .brand { font-size:25px; font-weight:800; letter-spacing:.4px; }
   .brand span { color:var(--accent); }
   .sub { color:var(--muted); font-size:13px; }
-  .banner { margin:16px 0; padding:10px 14px; border-radius:10px;
+  .banner { margin:14px 0; padding:10px 14px; border-radius:10px;
     background:rgba(245,166,35,.12); border:1px solid rgba(245,166,35,.4); color:var(--amber); font-size:13px; }
-  .topbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
-  .chip { padding:6px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); font-size:12.5px; color:var(--muted); }
-  .chip b { color:var(--text); }
-  .regime-badge { padding:5px 12px; border-radius:999px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; font-size:12.5px; }
-  .tf-table { width:100%; border-collapse:collapse; margin:6px 0 18px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  .tf-table th, .tf-table td { padding:8px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--line); }
-  .tf-table th { color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
+  .stats { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .stat { flex:1; min-width:150px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .stat .lab { color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; }
+  .stat .val { font-size:22px; font-weight:800; margin-top:2px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { padding:7px 14px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--text); font-size:13px; cursor:pointer; }
+  .btn.active { border-color:var(--accent); color:#fff; background:rgba(108,92,231,.25); }
+  .tf-table { width:100%; border-collapse:collapse; margin:4px 0 18px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .tf-table th, .tf-table td { padding:7px 12px; text-align:left; font-size:12.5px; border-bottom:1px solid var(--line); }
+  .tf-table th { color:var(--muted); text-transform:uppercase; font-size:10.5px; letter-spacing:.5px; }
   .tf-table tr:last-child td { border-bottom:0; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; position:relative; }
-  .card.long  { border-left:4px solid var(--green); }
-  .card.short { border-left:4px solid var(--red); }
-  .card.no    { border-left:4px solid var(--muted); opacity:.82; }
-  .rank { position:absolute; top:14px; right:14px; font-size:11px; color:var(--muted); }
-  .sym { font-size:18px; font-weight:800; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:13px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px; position:relative; }
+  .card.bull { border-left:4px solid var(--green); }
+  .card.bear { border-left:4px solid var(--red); }
+  .card.neutral { border-left:4px solid var(--muted); opacity:.8; }
+  .rank { position:absolute; top:13px; right:14px; font-size:11px; color:var(--muted); }
+  .sym { font-size:17px; font-weight:800; }
   .px { color:var(--muted); font-size:13px; }
-  .dir { display:inline-block; margin:10px 0 8px; padding:7px 14px; border-radius:9px; font-weight:800; font-size:16px; letter-spacing:.5px; }
-  .dir.long  { background:rgba(46,204,113,.14); color:var(--green); }
-  .dir.short { background:rgba(255,92,92,.14); color:var(--red); }
-  .dir.no    { background:rgba(139,152,169,.14); color:var(--muted); }
-  .lev { font-size:12px; color:var(--muted); margin-left:8px; }
+  .dir { display:inline-block; margin:9px 0 7px; padding:6px 13px; border-radius:9px; font-weight:800; font-size:15px; letter-spacing:.5px; }
+  .dir.bull { background:rgba(46,204,113,.14); color:var(--green); }
+  .dir.bear { background:rgba(255,92,92,.14); color:var(--red); }
+  .dir.neutral { background:rgba(139,152,169,.14); color:var(--muted); }
   .bar { height:7px; border-radius:999px; background:var(--panel2); overflow:hidden; margin:4px 0 10px; }
   .bar > i { display:block; height:100%; }
-  .kv { display:flex; justify-content:space-between; padding:4px 0; font-size:13.5px; border-bottom:1px dashed var(--line); }
+  .kv { display:flex; justify-content:space-between; padding:4px 0; font-size:13px; border-bottom:1px dashed var(--line); }
   .kv:last-of-type { border-bottom:0; }
   .kv .k { color:var(--muted); }
   .num { font-variant-numeric:tabular-nums; }
   .tag { display:inline-block; padding:3px 9px; border-radius:7px; background:var(--panel2); border:1px solid var(--line); font-size:11.5px; color:var(--blue); }
   .hold { color:var(--amber); font-weight:700; }
-  .rat { color:var(--muted); font-size:12.5px; margin-top:8px; }
   h2.sec { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:6px 0 8px; }
-  footer { margin-top:28px; color:var(--muted); font-size:12px; text-align:center; }
+  footer { margin-top:26px; color:var(--muted); font-size:12px; text-align:center; }
   a { color:var(--blue); }
 </style>
 </head>
@@ -59,15 +61,17 @@
 <div class="wrap">
   <header>
     <div>
-      <div class="brand">naat<span>ai</span> · perp signals</div>
+      <div class="brand">naat<span>ai</span> · perp scanner</div>
       <div class="sub" id="sub"></div>
     </div>
-    <div id="regimeBadge"></div>
+    <div id="hitBadge"></div>
   </header>
 
   <div class="banner" id="banner">Loading…</div>
 
-  <div class="topbar" id="topbar"></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls" id="controls"></div>
 
   <h2 class="sec">How long to hold (by signal timeframe)</h2>
   <table class="tf-table" id="tfTable"><tbody></tbody></table>
@@ -76,73 +80,75 @@
   <div class="grid" id="grid"></div>
 
   <footer>
-    naatai — modular AI trading system ·
-    <a href="https://github.com/robintex7-cpu/naatai" target="_blank" rel="noopener">source</a><br/>
-    DEMO interface. Educational only — not financial advice. No signal is 100% accurate; trade your own risk.
+    naatai · <a href="https://github.com/robintex7-cpu/naatai" target="_blank" rel="noopener">source</a> ·
+    data refreshes ~every 15 min from Binance public API<br/>
+    Educational tool, NOT financial advice. No signal is 100% accurate. Futures use leverage — you can lose more than your margin.
   </footer>
 </div>
 
 <script>
-const regimeColors = { bull:"#2ecc71", bear:"#ff5c5c", chop:"#f5a623", high_vol:"#4d9fff", crisis:"#ff5c5c", unknown:"#8b98a9" };
+let DATA = null, filter = "ALL";
 const pct = x => (x*100).toFixed(0) + "%";
-const usd = x => "$" + Number(x).toLocaleString("en-US", { maximumFractionDigits: x < 10 ? 4 : 2 });
+const usd = x => "$" + Number(x).toLocaleString("en-US", { maximumFractionDigits: Math.abs(x) < 10 ? 5 : 2 });
 
-function render(d) {
+function render() {
+  const d = DATA;
   document.getElementById("sub").textContent =
-    d.meta.market_type + " · updated " + new Date(d.meta.generated_at).toLocaleString();
-  document.getElementById("banner").textContent = "● " + d.meta.mode + " MODE — " + d.meta.note;
+    d.meta.source + " · updated " + new Date(d.meta.generated_at).toLocaleString();
+  document.getElementById("banner").textContent =
+    "● " + d.meta.mode + " — " + d.meta.note;
 
-  const r = d.regime, rc = regimeColors[r.label] || "#8b98a9";
-  document.getElementById("regimeBadge").innerHTML =
-    `<span class="regime-badge" style="background:${rc}22;color:${rc};border:1px solid ${rc}66">REGIME: ${r.label} ${pct(r.confidence)}</span>`;
+  const bt = d.meta.backtest || {};
+  const hr = bt.hit_rate_pct;
+  const hrColor = hr == null ? "var(--muted)" : hr >= 55 ? "var(--green)" : hr >= 50 ? "var(--amber)" : "var(--red)";
+  document.getElementById("hitBadge").innerHTML = hr == null ? "" :
+    `<span class="tag" style="color:${hrColor};border-color:${hrColor}66">Backtest hit-rate: ${hr}% (n=${bt.samples})</span>`;
 
-  const longs  = d.signals.filter(s => s.direction === "LONG").length;
-  const shorts = d.signals.filter(s => s.direction === "SHORT").length;
-  const flats  = d.signals.filter(s => s.direction === "NO TRADE").length;
-  document.getElementById("topbar").innerHTML =
-    `<span class="chip">Coins: <b>${d.signals.length}</b></span>
-     <span class="chip" style="color:var(--green)">Long: <b>${longs}</b></span>
-     <span class="chip" style="color:var(--red)">Short: <b>${shorts}</b></span>
-     <span class="chip">No-trade: <b>${flats}</b></span>`;
+  const bulls = d.signals.filter(s => s.direction === "BULL").length;
+  const bears = d.signals.filter(s => s.direction === "BEAR").length;
+  const neut  = d.signals.filter(s => s.direction === "NEUTRAL").length;
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="lab">Pairs in market</div><div class="val">${d.meta.universe_total ?? "—"}</div></div>
+    <div class="stat"><div class="lab">Analysed (liquid)</div><div class="val">${d.meta.analysed ?? d.signals.length}</div></div>
+    <div class="stat"><div class="lab" style="color:var(--green)">Bullish</div><div class="val" style="color:var(--green)">${bulls}</div></div>
+    <div class="stat"><div class="lab" style="color:var(--red)">Bearish</div><div class="val" style="color:var(--red)">${bears}</div></div>`;
+
+  document.getElementById("controls").innerHTML = ["ALL","BULL","BEAR","NEUTRAL"].map(f =>
+    `<button class="btn ${filter===f?"active":""}" onclick="setFilter('${f}')">${f}${
+      f==="BULL"?" ("+bulls+")":f==="BEAR"?" ("+bears+")":f==="NEUTRAL"?" ("+neut+")":""}</button>`).join("");
 
   document.querySelector("#tfTable tbody").innerHTML =
     `<tr><th>Chart timeframe</th><th>Suggested holding time</th></tr>` +
     d.timeframe_map.map(t => `<tr><td><span class="tag">${t.tf}</span></td><td class="hold">${t.hold}</td></tr>`).join("");
 
-  const order = { "LONG":2, "SHORT":2, "NO TRADE":0 };
-  const sorted = [...d.signals].sort((a,b) =>
-    (order[b.direction]-order[a.direction]) || (b.confidence-a.confidence));
-
-  document.getElementById("grid").innerHTML = sorted.map((s,i) => {
-    const cls = s.direction === "LONG" ? "long" : s.direction === "SHORT" ? "short" : "no";
-    const convColor = s.confidence >= 0.8 ? "var(--green)" : s.confidence >= 0.6 ? "var(--amber)" : "var(--muted)";
-    const trade = s.direction !== "NO TRADE";
+  const list = d.signals.filter(s => filter === "ALL" || s.direction === filter);
+  document.getElementById("grid").innerHTML = list.map((s,i) => {
+    const cls = s.direction.toLowerCase();
+    const cc = s.confidence >= 0.6 ? (cls==="bear"?"var(--red)":"var(--green)") : "var(--amber)";
+    const trade = s.direction !== "NEUTRAL";
     return `
     <div class="card ${cls}">
       <div class="rank">#${i+1}</div>
       <div class="sym">${s.symbol}</div>
-      <div class="px num">${usd(s.price)}</div>
-      <div>
-        <span class="dir ${cls}">${s.direction}</span>
-        ${trade ? `<span class="lev">${s.leverage}</span>` : ""}
-      </div>
-      <div class="kv"><span class="k">Conviction</span><span class="num" style="color:${convColor};font-weight:700">${pct(s.confidence)}</span></div>
-      <div class="bar"><i style="width:${s.confidence*100}%;background:${convColor}"></i></div>
-      <div class="kv"><span class="k">Signal timeframe</span><span><span class="tag">${s.signal_tf}</span></span></div>
+      <div class="px num">${usd(s.price)} · 24h ${s.chg24h>=0?"+":""}${s.chg24h}%</div>
+      <div><span class="dir ${cls}">${s.direction}</span></div>
+      <div class="kv"><span class="k">Conviction</span><span class="num" style="color:${cc};font-weight:700">${pct(s.confidence)}</span></div>
+      <div class="bar"><i style="width:${s.confidence*100}%;background:${cc}"></i></div>
+      <div class="kv"><span class="k">Signal timeframe</span><span class="tag">${s.signal_tf}</span></div>
       <div class="kv"><span class="k">Hold for</span><span class="hold">${s.hold}</span></div>
       ${trade ? `
-        <div class="kv"><span class="k">Entry</span><span class="num">${usd(s.entry)}</span></div>
-        <div class="kv"><span class="k">Stop loss</span><span class="num" style="color:var(--red)">${usd(s.stop)}</span></div>
-        <div class="kv"><span class="k">Take profit</span><span class="num" style="color:var(--green)">${usd(s.take_profit)}</span></div>
-      ` : ""}
-      <div class="rat">${s.rationale}</div>
+      <div class="kv"><span class="k">Entry</span><span class="num">${usd(s.entry)}</span></div>
+      <div class="kv"><span class="k">Stop loss</span><span class="num" style="color:var(--red)">${usd(s.stop)}</span></div>
+      <div class="kv"><span class="k">Take profit</span><span class="num" style="color:var(--green)">${usd(s.take_profit)}</span></div>` : ""}
+      <div class="kv"><span class="k">RSI · volatility</span><span class="num">${s.rsi} · ${s.vol_pct}%</span></div>
     </div>`;
   }).join("");
 }
+function setFilter(f){ filter=f; render(); }
 
 fetch("data.json?_=" + Date.now())
   .then(r => r.json())
-  .then(render)
+  .then(d => { DATA = d; render(); })
   .catch(e => { document.getElementById("banner").textContent = "Could not load data.json — " + e; });
 </script>
 </body>
