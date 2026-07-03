@@ -61,7 +61,7 @@ cvd = ta.cum(delta)
 plot(paneMode ? cvd : na, "CVD", color=#3987e5, linewidth=2)
 plot(paneMode ? delta : na, "Delta", style=plot.style_columns,
      color=delta >= 0 ? color.new(#2ecc71, 25) : color.new(#ff5c5c, 25))
-hline(0, "Zero", color=color.new(color.gray, 60), display=paneMode ? display.all : display.none)
+plot(paneMode ? 0 : na, "Zero line", color=color.new(color.gray, 60), style=plot.style_linebr)
 
 // ───────────────────── CVD divergence detection ─────────────────────
 ph = ta.pivothigh(high, divLen, divLen)
