@@ -106,7 +106,8 @@ if barstate.isconfirmed
 histP    = (array.get(stUp, state) + 1.0) / (array.get(stTotal, state) + 2.0)  // Laplace-smoothed
 deltaSc  = totVol > 0 ? buyVol / totVol : 0.5
 rsiSc    = math.max(0.0, math.min(1.0, rsi / 100))
-trendSc  = math.max(0.0, math.min(1.0, 0.5 + (emaF - emaS) / (4 * ta.atr(14))))
+atrVal   = ta.atr(14)
+trendSc  = atrVal > 0 ? math.max(0.0, math.min(1.0, 0.5 + (emaF - emaS) / (4 * atrVal))) : 0.5
 probUp   = 100 * (0.45 * histP + 0.30 * deltaSc + 0.15 * rsiSc + 0.10 * trendSc)
 probUp  := math.max(1, math.min(99, probUp))
 probDown = 100 - probUp
