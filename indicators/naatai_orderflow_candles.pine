@@ -1,0 +1,258 @@
+//@version=6
+// NaatAI OrderFlow Candles
+// ------------------------
+// A candle-replacement indicator inspired by footprint / orderflow charts.
+// Features:
+//   * Custom delta-colored candles (hide the chart's own candles to "replace" them)
+//   * Real-time buy volume / sell volume / delta per candle (lower-timeframe based)
+//   * Footprint cells inside each candle with buy/sell imbalance highlighting
+//   * Next-candle probability (bullish %) from an adaptive statistics engine
+//   * RSI value, auto Fibonacci retracement levels + nearest level readout
+//   * BUY / SELL signals with alerts
+indicator("NaatAI OrderFlow Candles", "NaatAI OFC", overlay = true,
+     max_labels_count = 500, max_boxes_count = 500, max_lines_count = 100)
+
+// ---------------------------------------------------------------- inputs ---
+grpVol   = "Volume engine"
+ltfIn    = input.timeframe("", "Lower timeframe (blank = auto)", group = grpVol,
+     tooltip = "Intrabar timeframe used to split volume into buy/sell. Leave blank to pick automatically from the chart timeframe.")
+grpCndl  = "Candles & footprint"
+showFp   = input.bool(true,  "Show footprint cells",        group = grpCndl)
+fpBars   = input.int(24,     "Footprint: last N bars",      group = grpCndl, minval = 2,  maxval = 60)
+fpRows   = input.int(4,      "Footprint: rows per candle",  group = grpCndl, minval = 2,  maxval = 8)
+imbRatio = input.float(3.0,  "Imbalance ratio (x)",         group = grpCndl, minval = 1.5, step = 0.5,
+     tooltip = "A footprint cell is highlighted orange when one side's volume is at least this many times the other side's.")
+showLbl  = input.bool(true,  "Show volume/delta labels",    group = grpCndl)
+lblBars  = input.int(30,     "Labels: last N bars",         group = grpCndl, minval = 2, maxval = 120)
+grpSig   = "Signals & probability"
+rsiLen   = input.int(14,     "RSI length",                  group = grpSig, minval = 2)
+emaFLen  = input.int(21,     "Fast EMA",                    group = grpSig, minval = 2)
+emaSLen  = input.int(50,     "Slow EMA",                    group = grpSig, minval = 3)
+probThr  = input.int(65,     "Signal probability threshold %", group = grpSig, minval = 50, maxval = 95)
+grpFib   = "Fibonacci"
+showFib  = input.bool(true,  "Show fibonacci levels",       group = grpFib)
+fibLen   = input.int(120,    "Swing lookback (bars)",       group = grpFib, minval = 20)
+grpUi    = "Dashboard"
+tblPos   = input.string("Top right", "Dashboard position", group = grpUi,
+     options = ["Top right", "Top left", "Bottom right", "Bottom left"])
+
+// ------------------------------------------------------------- utilities ---
+fmtVol(float v) =>
+    a = math.abs(v)
+    a >= 1e9 ? str.tostring(v / 1e9, "#.##") + "B" :
+     a >= 1e6 ? str.tostring(v / 1e6, "#.##") + "M" :
+     a >= 1e3 ? str.tostring(v / 1e3, "#.#")  + "K" :
+     str.tostring(v, "#.##")
+
+autoLtf() =>
+    s = timeframe.in_seconds(timeframe.period)
+    s >= 86400 ? "30" : s >= 14400 ? "15" : s >= 3600 ? "5" : s >= 300 ? "1" : timeframe.period
+
+ltf = ltfIn == "" ? autoLtf() : ltfIn
+
+// ------------------------------------------------- buy / sell volume (LTF) ---
+[ltfO, ltfC, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [open, close, volume])
+
+float buyVol  = 0.0
+float sellVol = 0.0
+bool  haveLtf = array.size(ltfV) > 0
+if haveLtf
+    for i = 0 to array.size(ltfV) - 1
+        v = nz(array.get(ltfV, i))
+        if array.get(ltfC, i) > array.get(ltfO, i)
+            buyVol += v
+        else if array.get(ltfC, i) < array.get(ltfO, i)
+            sellVol += v
+        else
+            buyVol  += v / 2
+            sellVol += v / 2
+else
+    // fallback: approximate pressure from where the close sits in the range
+    rng = high - low
+    bp  = rng > 0 ? (close - low) / rng : 0.5
+    buyVol  := nz(volume) * bp
+    sellVol := nz(volume) * (1 - bp)
+
+delta    = buyVol - sellVol
+totVol   = buyVol + sellVol
+deltaPct = totVol > 0 ? 100 * delta / totVol : 0.0
+var float cumDelta = 0.0
+if barstate.isconfirmed
+    cumDelta += delta
+
+// ------------------------------------------------------- indicators used ---
+rsi  = ta.rsi(close, rsiLen)
+emaF = ta.ema(close, emaFLen)
+emaS = ta.ema(close, emaSLen)
+
+// -------------------------------------------------- next-candle probability ---
+// Adaptive engine: bucket every bar into a state (delta sign x RSI zone x trend)
+// and track how often the NEXT bar closed up from that state.
+dSign = delta > 0 ? 1 : 0
+rZone = rsi < 40 ? 0 : rsi > 60 ? 2 : 1
+tSign = emaF > emaS ? 1 : 0
+state = dSign * 6 + rZone * 2 + tSign
+
+var int[] stTotal = array.new_int(12, 0)
+var int[] stUp    = array.new_int(12, 0)
+var int   prevState = -1
+if barstate.isconfirmed
+    if prevState >= 0
+        array.set(stTotal, prevState, array.get(stTotal, prevState) + 1)
+        if close > open
+            array.set(stUp, prevState, array.get(stUp, prevState) + 1)
+    prevState := state
+
+histP    = (array.get(stUp, state) + 1.0) / (array.get(stTotal, state) + 2.0)  // Laplace-smoothed
+deltaSc  = totVol > 0 ? buyVol / totVol : 0.5
+rsiSc    = math.max(0.0, math.min(1.0, rsi / 100))
+trendSc  = math.max(0.0, math.min(1.0, 0.5 + (emaF - emaS) / (4 * ta.atr(14))))
+probUp   = 100 * (0.45 * histP + 0.30 * deltaSc + 0.15 * rsiSc + 0.10 * trendSc)
+probUp  := math.max(1, math.min(99, probUp))
+probDown = 100 - probUp
+
+// ------------------------------------------------------------- fibonacci ---
+hh    = ta.highest(high, fibLen)
+ll    = ta.lowest(low,  fibLen)
+hhBar = ta.highestbars(high, fibLen)  // 0 or negative offset
+llBar = ta.lowestbars(low,  fibLen)
+upSwing = hhBar > llBar               // high is more recent -> retrace down from it
+fibRange = hh - ll
+fibAt(float r) => upSwing ? hh - fibRange * r : ll + fibRange * r
+
+var float[] fibRatios = array.from(0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0)
+float nearFibPrice = na
+float nearFibRatio = na
+float bestDist = na
+for i = 0 to array.size(fibRatios) - 1
+    r  = array.get(fibRatios, i)
+    p  = fibAt(r)
+    d  = math.abs(close - p)
+    if na(bestDist) or d < bestDist
+        bestDist     := d
+        nearFibPrice := p
+        nearFibRatio := r
+
+var line[]  fibLines  = array.new_line()
+var label[] fibLabels = array.new_label()
+if showFib and barstate.islast
+    // (re)draw levels once per update
+    while array.size(fibLines) > 0
+        line.delete(array.pop(fibLines))
+    while array.size(fibLabels) > 0
+        label.delete(array.pop(fibLabels))
+    for i = 0 to array.size(fibRatios) - 1
+        r = array.get(fibRatios, i)
+        p = fibAt(r)
+        col = r == 0.5 ? color.new(color.orange, 30) : color.new(color.teal, 55)
+        array.push(fibLines, line.new(math.max(0, bar_index - fibLen), p, bar_index + 8, p,
+             color = col, style = line.style_dotted, width = r == 0.618 or r == 0.382 ? 2 : 1))
+        array.push(fibLabels, label.new(bar_index + 8, p,
+             str.tostring(r, "#.###") + "  " + str.tostring(p, format.mintick),
+             style = label.style_none, textcolor = col, size = size.small))
+
+// ----------------------------------------------------------- signal logic ---
+buyCond  = probUp   >= probThr and delta > 0 and rsi < 75 and emaF > emaS
+sellCond = probDown >= probThr and delta < 0 and rsi > 25 and emaF < emaS
+buySig   = buyCond  and not buyCond[1]
+sellSig  = sellCond and not sellCond[1]
+
+// -------------------------------------------------------- candle painting ---
+colBuy    = color.rgb(8, 153, 129)
+colSell   = color.rgb(242, 54, 69)
+strength  = math.min(math.abs(deltaPct), 60) / 60          // 0..1
+bodyCol   = delta >= 0 ?
+     color.new(colBuy,  int(55 - 45 * strength)) :
+     color.new(colSell, int(55 - 45 * strength))
+edgeCol   = delta >= 0 ? colBuy : colSell
+plotcandle(open, high, low, close, title = "OrderFlow candles",
+     color = bodyCol, wickcolor = edgeCol, bordercolor = edgeCol)
+
+plotshape(buySig,  title = "BUY signal",  style = shape.triangleup,
+     location = location.belowbar, color = colBuy,  size = size.small, text = "BUY")
+plotshape(sellSig, title = "SELL signal", style = shape.triangledown,
+     location = location.abovebar, color = colSell, size = size.small, text = "SELL")
+
+// -------------------------------------------------------- footprint cells ---
+var box[] fpBoxes = array.new_box()
+if showFp and barstate.isconfirmed and haveLtf
+    rng = high - low
+    if rng > 0
+        rowBuy  = array.new_float(fpRows, 0.0)
+        rowSell = array.new_float(fpRows, 0.0)
+        for i = 0 to array.size(ltfV) - 1
+            p   = array.get(ltfC, i)
+            idx = math.max(0, math.min(fpRows - 1, int(math.floor((p - low) / rng * fpRows))))
+            v   = nz(array.get(ltfV, i))
+            if array.get(ltfC, i) >= array.get(ltfO, i)
+                array.set(rowBuy, idx, array.get(rowBuy, idx) + v)
+            else
+                array.set(rowSell, idx, array.get(rowSell, idx) + v)
+        for r2 = 0 to fpRows - 1
+            b = array.get(rowBuy, r2)
+            s = array.get(rowSell, r2)
+            if b + s > 0
+                yB = low + rng * r2 / fpRows
+                yT = low + rng * (r2 + 1) / fpRows
+                buyImb  = s > 0 ? b / s >= imbRatio : b > 0
+                sellImb = b > 0 ? s / b >= imbRatio : s > 0
+                bCol = buyImb ? color.new(color.orange, 0) : sellImb ? color.new(color.orange, 0) : color.new(color.gray, 60)
+                fCol = b >= s ? color.new(colBuy, 78) : color.new(colSell, 78)
+                array.push(fpBoxes, box.new(bar_index, yT, bar_index, yB,
+                     border_color = bCol, border_width = buyImb or sellImb ? 2 : 1,
+                     bgcolor = fCol, text = fmtVol(s) + " x " + fmtVol(b),
+                     text_size = size.tiny, text_color = color.new(chart.fg_color, 15)))
+    while array.size(fpBoxes) > fpBars * fpRows
+        box.delete(array.shift(fpBoxes))
+
+// ------------------------------------------------- per-candle info labels ---
+var label[] volLabels = array.new_label()
+if showLbl and barstate.isconfirmed
+    txtTop = "V:" + fmtVol(totVol) + "\nH-L:" + str.tostring(high - low, format.mintick)
+    array.push(volLabels, label.new(bar_index, high, txtTop,
+         style = label.style_none, textcolor = color.new(color.rgb(66, 135, 245), 10),
+         size = size.tiny, yloc = yloc.abovebar))
+    txtBot = (delta >= 0 ? "+" : "") + fmtVol(delta)
+    array.push(volLabels, label.new(bar_index, low, txtBot,
+         style = label.style_none, textcolor = delta >= 0 ? colBuy : colSell,
+         size = size.tiny, yloc = yloc.belowbar))
+    while array.size(volLabels) > lblBars * 2
+        label.delete(array.shift(volLabels))
+
+// -------------------------------------------------------------- dashboard ---
+pos = tblPos == "Top right" ? position.top_right :
+     tblPos == "Top left" ? position.top_left :
+     tblPos == "Bottom right" ? position.bottom_right : position.bottom_left
+var table dash = table.new(pos, 2, 9, bgcolor = color.new(chart.bg_color, 15),
+     border_color = color.new(color.gray, 60), border_width = 1)
+if barstate.islast
+    hdr = color.new(color.rgb(66, 135, 245), 0)
+    fg  = chart.fg_color
+    table.cell(dash, 0, 0, "NaatAI OFC", text_color = hdr, text_size = size.small)
+    table.cell(dash, 1, 0, timeframe.period, text_color = hdr, text_size = size.small)
+    table.cell(dash, 0, 1, "Buy Vol",  text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 1, fmtVol(buyVol),  text_color = colBuy,  text_size = size.small)
+    table.cell(dash, 0, 2, "Sell Vol", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 2, fmtVol(sellVol), text_color = colSell, text_size = size.small)
+    table.cell(dash, 0, 3, "Delta",    text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 3, (delta >= 0 ? "+" : "") + fmtVol(delta) + "  (" + str.tostring(deltaPct, "#.#") + "%)",
+         text_color = delta >= 0 ? colBuy : colSell, text_size = size.small)
+    table.cell(dash, 0, 4, "Cum Delta", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 4, (cumDelta >= 0 ? "+" : "") + fmtVol(cumDelta),
+         text_color = cumDelta >= 0 ? colBuy : colSell, text_size = size.small)
+    table.cell(dash, 0, 5, "RSI(" + str.tostring(rsiLen) + ")", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 5, str.tostring(rsi, "#.#"),
+         text_color = rsi > 70 ? colSell : rsi < 30 ? colBuy : fg, text_size = size.small)
+    table.cell(dash, 0, 6, "Fib " + str.tostring(nearFibRatio, "#.###"), text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 6, str.tostring(nearFibPrice, format.mintick), text_color = color.teal, text_size = size.small)
+    table.cell(dash, 0, 7, "Next candle", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 7, "▲ " + str.tostring(probUp, "#") + "%   ▼ " + str.tostring(probDown, "#") + "%",
+         text_color = probUp >= 50 ? colBuy : colSell, text_size = size.small)
+    sigTxt = buyCond ? "BUY" : sellCond ? "SELL" : "WAIT"
+    table.cell(dash, 0, 8, "Signal", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 8, sigTxt,
+         text_color = buyCond ? colBuy : sellCond ? colSell : color.gray, text_size = size.small)
+
+// ------------------------------------------------------------------ alerts ---
+alertcondition(buySig,  "NaatAI BUY",  "NaatAI OFC: BUY signal — bullish probability above threshold")
+alertcondition(sellSig, "NaatAI SELL", "NaatAI OFC: SELL signal — bearish probability above threshold")
