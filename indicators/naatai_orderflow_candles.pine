@@ -31,6 +31,14 @@ rsiLen   = input.int(14,     "RSI length",                  group = grpSig, minv
 emaFLen  = input.int(21,     "Fast EMA",                    group = grpSig, minval = 2)
 emaSLen  = input.int(50,     "Slow EMA",                    group = grpSig, minval = 3)
 probThr  = input.int(65,     "Signal probability threshold %", group = grpSig, minval = 50, maxval = 95)
+dpThr    = input.float(15,   "Min |delta| % to confirm",       group = grpSig, minval = 0, maxval = 60,
+     tooltip = "A signal needs at least this much one-sided volume dominance in the candle. Higher = fewer, stronger signals.")
+sigGap   = input.int(10,     "Min bars between signals",       group = grpSig, minval = 0)
+useHtf   = input.bool(true,  "Higher-timeframe trend filter",  group = grpSig, inline = "htf")
+htfTf    = input.timeframe("240", "",                          group = grpSig, inline = "htf")
+htfLen   = input.int(50,     "HTF EMA length",                 group = grpSig, minval = 5)
+showRisk = input.bool(true,  "Show SL/TP on signals",          group = grpSig)
+rrRatio  = input.float(2.0,  "Take-profit R:R",                group = grpSig, minval = 0.5, step = 0.5)
 grpFib   = "Fibonacci"
 showFib  = input.bool(true,  "Show fibonacci levels",       group = grpFib)
 fibLen   = input.int(120,    "Swing lookback (bars)",       group = grpFib, minval = 20)
@@ -155,10 +163,42 @@ if showFib and barstate.islast
              style = label.style_none, textcolor = col, size = size.small))
 
 // ----------------------------------------------------------- signal logic ---
-buyCond  = probUp   >= probThr and delta > 0 and rsi < 75 and emaF > emaS
-sellCond = probDown >= probThr and delta < 0 and rsi > 25 and emaF < emaS
-buySig   = buyCond  and not buyCond[1]
-sellSig  = sellCond and not sellCond[1]
+// Higher-timeframe trend filter (non-repainting: uses the last CLOSED HTF bar)
+htfEma    = request.security(syminfo.tickerid, htfTf, ta.ema(close, htfLen)[1],
+     lookahead = barmerge.lookahead_on)
+htfBull   = close > htfEma
+htfOkBuy  = not useHtf or htfBull
+htfOkSell = not useHtf or not htfBull
+
+strongDelta = math.abs(deltaPct) >= dpThr
+buyCond  = probUp   >= probThr and delta > 0 and strongDelta and rsi > 40 and rsi < 75 and emaF > emaS and htfOkBuy
+sellCond = probDown >= probThr and delta < 0 and strongDelta and rsi < 60 and rsi > 25 and emaF < emaS and htfOkSell
+
+// Non-repainting: a signal only prints when the candle CLOSES with the
+// conditions met, and never twice within `sigGap` bars.
+var int lastSigBar = -100000
+canSig  = bar_index - lastSigBar >= sigGap
+buySig  = buyCond  and not buyCond[1]  and canSig and barstate.isconfirmed
+sellSig = sellCond and not sellCond[1] and canSig and barstate.isconfirmed
+if buySig or sellSig
+    lastSigBar := bar_index
+
+// Suggested stop-loss / take-profit (ATR based) drawn at each signal
+var label[] riskLabels = array.new_label()
+if showRisk and (buySig or sellSig)
+    slDist = 1.5 * atrVal
+    sl = buySig ? close - slDist : close + slDist
+    tp = buySig ? close + slDist * rrRatio : close - slDist * rrRatio
+    rTxt = (buySig ? "BUY  " : "SELL ") + str.tostring(close, format.mintick) +
+         "\nSL " + str.tostring(sl, format.mintick) +
+         "\nTP " + str.tostring(tp, format.mintick)
+    array.push(riskLabels, label.new(bar_index, buySig ? low : high, rTxt,
+         style = buySig ? label.style_label_up : label.style_label_down,
+         color = color.new(buySig ? color.rgb(8, 153, 129) : color.rgb(242, 54, 69), 25),
+         textcolor = color.white, size = size.small,
+         yloc = buySig ? yloc.belowbar : yloc.abovebar))
+    while array.size(riskLabels) > 12
+        label.delete(array.shift(riskLabels))
 
 // -------------------------------------------------------- candle painting ---
 colBuy    = color.rgb(8, 153, 129)
@@ -228,7 +268,7 @@ if showLbl and barstate.isconfirmed
 pos = tblPos == "Top right" ? position.top_right :
      tblPos == "Top left" ? position.top_left :
      tblPos == "Bottom right" ? position.bottom_right : position.bottom_left
-var table dash = table.new(pos, 2, 9, bgcolor = color.new(chart.bg_color, 15),
+var table dash = table.new(pos, 2, 10, bgcolor = color.new(chart.bg_color, 15),
      border_color = color.new(color.gray, 60), border_width = 1)
 if barstate.islast
     hdr = color.new(color.rgb(66, 135, 245), 0)
@@ -253,9 +293,12 @@ if barstate.islast
     table.cell(dash, 0, 7, "Next candle", text_color = fg, text_size = size.small)
     table.cell(dash, 1, 7, "▲ " + str.tostring(probUp, "#") + "%   ▼ " + str.tostring(probDown, "#") + "%",
          text_color = probUp >= 50 ? colBuy : colSell, text_size = size.small)
+    table.cell(dash, 0, 8, "HTF trend (" + htfTf + ")", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 8, htfBull ? "UP" : "DOWN",
+         text_color = htfBull ? colBuy : colSell, text_size = size.small)
     sigTxt = buyCond ? "BUY" : sellCond ? "SELL" : "WAIT"
-    table.cell(dash, 0, 8, "Signal", text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 8, sigTxt,
+    table.cell(dash, 0, 9, "Signal", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 9, sigTxt,
          text_color = buyCond ? colBuy : sellCond ? colSell : color.gray, text_size = size.small)
 
 // ------------------------------------------------------------------ alerts ---
