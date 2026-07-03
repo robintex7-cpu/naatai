@@ -1,0 +1,44 @@
+//@version=5
+// NaatAI Heikin Ashi Panel — companion pane for "NaatAI OrderFlow Candles".
+// Shows higher-timeframe Heikin Ashi candles (default 1h) with a trend/RSI
+// table and a flip marker. Add it below the main chart: it loads in its own
+// pane automatically (overlay=false).
+indicator("NaatAI Heikin Ashi Panel", "NaatAI HA", overlay=false, format=format.price)
+
+haTf = input.timeframe("60", "Heikin Ashi timeframe")
+
+cGreen = #2ecc71
+cRed   = #ff5c5c
+cMut   = #8b98a9
+
+haTicker = ticker.heikinashi(syminfo.tickerid)
+[haO, haH, haL, haC] = request.security(haTicker, haTf, [open, high, low, close])
+haRsi = request.security(syminfo.tickerid, haTf, ta.rsi(close, 14))
+
+haUp   = haC >= haO
+candCol = haUp ? cGreen : cRed
+plotcandle(haO, haH, haL, haC, "Heikin Ashi", color=candCol,
+     wickcolor=color.new(candCol, 30), bordercolor=candCol)
+
+// trend flip markers
+flipUp = haUp and not haUp[1]
+flipDn = not haUp and haUp[1]
+plotshape(flipUp, "HA flip up",   shape.triangleup,   location.bottom, cGreen, size=size.tiny,
+     text="flip", textcolor=cGreen)
+plotshape(flipDn, "HA flip down", shape.triangledown, location.top,    cRed,   size=size.tiny,
+     text="flip", textcolor=cRed)
+
+// mini table
+var table tbl = table.new(position.top_right, 2, 3,
+     bgcolor=color.new(#131823, 8), border_color=color.new(#232b3a, 0), border_width=1)
+if barstate.islast
+    mut = color.new(cMut, 0)
+    table.cell(tbl, 0, 0, "Heikin Ashi", text_color=color.new(#4d9fff, 0), text_size=size.small)
+    table.cell(tbl, 1, 0, haTf, text_color=color.new(#4d9fff, 0), text_size=size.small)
+    table.cell(tbl, 0, 1, "Trend", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 1, haUp ? "UP" : "DOWN", text_color=haUp ? cGreen : cRed, text_size=size.small)
+    table.cell(tbl, 0, 2, "RSI(14)", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(haRsi, "#.#"), text_color=color.new(#e6edf3, 0), text_size=size.small)
+
+alertcondition(flipUp, "NaatAI HA flip UP",   "NaatAI HA: momentum flipped UP on {{ticker}}")
+alertcondition(flipDn, "NaatAI HA flip DOWN", "NaatAI HA: momentum flipped DOWN on {{ticker}}")
