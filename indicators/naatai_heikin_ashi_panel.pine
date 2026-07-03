@@ -1,50 +1,45 @@
 //@version=6
-// NaatAI Heikin Ashi Panel + PC Trend
-// -----------------------------------
-// Shows a Heikin Ashi chart in its OWN window (pane), recreating the MT4
-// "Binary Breaker" main-chart setup: Heiken Ashi + PCTrendA trend line.
+// NaatAI Heiken Ashi + PC Trend
+// -----------------------------
+// TradingView combination of the two MT4 indicators from the Binary Breaker
+// template: "Heiken_Ashi" + "PCTrendA" (length 16), in ONE pane.
+//   * Heiken Ashi candles (MT4 default colors: red down / white up — changeable)
+//   * PC Trend line colored by direction, with dots at every color change
+//   * BUY/SELL signals when HA color and PC Trend direction align (candle close,
+//     non-repainting — the MT4 PCTrendA could repaint; this version cannot)
 //   * Timeframe selector — view any timeframe independently of the main chart
-//   * PC Trend line (length 16): blue = uptrend, orange = downtrend
-//   * BUY/SELL markers when Heikin Ashi color AND PC Trend direction align
-//   * Optional EMA / Bollinger overlays, RSI dashboard, alerts
 //   * Hidden "HA Close" plot so you can apply ANY other TradingView indicator
-//     on this panel (set that indicator's Source to "NaatAI HA: HA Close")
-indicator("NaatAI Heikin Ashi Panel", "NaatAI HA", overlay = false, format = format.price)
+//     on this pane (set that indicator's Source to "NaatAI HA+PC: HA Close")
+indicator("NaatAI Heiken Ashi + PC Trend", "NaatAI HA+PC", overlay = false, format = format.price)
 
 // ---------------------------------------------------------------- inputs ---
-haTf    = input.timeframe("", "Timeframe (blank = chart timeframe)",
-     tooltip = "The Heikin Ashi candles in this pane use this timeframe, independent of the main chart.")
-grpPct  = "PC Trend line"
-showPct = input.bool(true,  "Show PC Trend line", group = grpPct)
-pctLen  = input.int(16,     "Length",             group = grpPct, minval = 2)
-pctFlip = input.bool(true,  "Mark trend color changes", group = grpPct)
-grpInd  = "Extra indicators"
-showE1  = input.bool(false, "EMA fast",        group = grpInd, inline = "e1")
-e1Len   = input.int(9,      "",                group = grpInd, inline = "e1", minval = 2)
-showE2  = input.bool(false, "EMA slow",        group = grpInd, inline = "e2")
-e2Len   = input.int(21,     "",                group = grpInd, inline = "e2", minval = 2)
-showBB  = input.bool(false, "Bollinger Bands", group = grpInd, inline = "bb")
-bbLen   = input.int(20,     "",                group = grpInd, inline = "bb", minval = 2)
-bbMult  = input.float(2.0,  "mult",            group = grpInd, inline = "bb", step = 0.5)
-rsiLen  = input.int(14,     "RSI length (dashboard)", group = grpInd, minval = 2)
-showSig = input.bool(true,  "HA + PC Trend combo signals", group = grpInd)
-grpUi   = "Dashboard"
-showTbl = input.bool(true,  "Show dashboard",  group = grpUi)
-tblPos  = input.string("Top right", "Position", group = grpUi,
+haTf     = input.timeframe("", "Timeframe (blank = chart timeframe)")
+grpHa    = "Heiken Ashi"
+colDn    = input.color(color.rgb(255, 60, 60),    "Down candle", group = grpHa, inline = "c")
+colUp    = input.color(color.rgb(235, 235, 235),  "Up candle",   group = grpHa, inline = "c",
+     tooltip = "MT4 template defaults: red down / white up. Pick green/red if you prefer TradingView style.")
+grpPct   = "PC Trend (PCTrendA)"
+showPct  = input.bool(true, "Show PC Trend line", group = grpPct)
+pctLen   = input.int(16,    "Length",             group = grpPct, minval = 2)
+pctUpCol = input.color(color.rgb(41, 98, 255),  "Trend up",   group = grpPct, inline = "p")
+pctDnCol = input.color(color.rgb(255, 140, 0),  "Trend down", group = grpPct, inline = "p")
+pctFlip  = input.bool(true, "Mark trend color changes", group = grpPct)
+grpSig   = "Signals"
+showSig  = input.bool(true, "BUY/SELL when HA + PC Trend align", group = grpSig)
+grpUi    = "Dashboard"
+showTbl  = input.bool(true, "Show dashboard", group = grpUi)
+tblPos   = input.string("Top right", "Position", group = grpUi,
      options = ["Top right", "Top left", "Bottom right", "Bottom left"])
 
-// -------------------------------------------------------- heikin ashi data ---
+// -------------------------------------------------------- heiken ashi data ---
 haTicker = ticker.heikinashi(syminfo.tickerid)
 [haO, haH, haL, haC] = request.security(haTicker, haTf, [open, high, low, close],
      gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
-
-haUp   = haC >= haO
-colUp  = color.rgb(8, 153, 129)
-colDn  = color.rgb(242, 54, 69)
+haUp = haC >= haO
 
 // ------------------------------------------------------------- PC Trend ---
-// Recreation of the MT4 "PCTrendA" trend line: a low-lag (Hull-style) moving
-// average of the HA close, colored by its slope. Blue = up, orange = down.
+// Recreation of MT4 "PCTrendA": a low-lag (Hull-style) moving average of the
+// HA close, colored by its slope.
 hmaOf(src, int len) =>
     half = math.max(1, int(math.floor(len / 2.0)))
     rt   = math.max(1, int(math.floor(math.sqrt(len))))
@@ -52,79 +47,60 @@ hmaOf(src, int len) =>
 
 pcLine = hmaOf(haC, pctLen)
 pcUp   = pcLine > pcLine[1]
-pcCol  = pcUp ? color.rgb(41, 98, 255) : color.rgb(255, 140, 0)
-
-// ------------------------------------------------------ built-in overlays ---
-ema1   = ta.ema(haC, e1Len)
-ema2   = ta.ema(haC, e2Len)
-bbBase = ta.sma(haC, bbLen)
-bbDev  = bbMult * ta.stdev(haC, bbLen)
-rsiHa  = ta.rsi(haC, rsiLen)
+pcCol  = pcUp ? pctUpCol : pctDnCol
 
 // ------------------------------------------------------------------ plots ---
-plotcandle(haO, haH, haL, haC, title = "Heikin Ashi",
+plotcandle(haO, haH, haL, haC, title = "Heiken Ashi",
      color = haUp ? colUp : colDn,
      wickcolor = haUp ? colUp : colDn,
      bordercolor = haUp ? colUp : colDn)
 
 plot(showPct ? pcLine : na, "PC Trend", color = pcCol, linewidth = 2)
 plotshape(showPct and pctFlip and pcUp and not pcUp[1] ? pcLine : na, "PC flip up",
-     style = shape.circle, location = location.absolute, color = color.rgb(41, 98, 255), size = size.tiny)
+     style = shape.circle, location = location.absolute, color = pctUpCol, size = size.tiny)
 plotshape(showPct and pctFlip and not pcUp and pcUp[1] ? pcLine : na, "PC flip down",
-     style = shape.circle, location = location.absolute, color = color.rgb(255, 140, 0), size = size.tiny)
+     style = shape.circle, location = location.absolute, color = pctDnCol, size = size.tiny)
 
-plot(showE1 ? ema1 : na, "EMA fast", color = color.new(color.rgb(66, 135, 245), 0), linewidth = 1)
-plot(showE2 ? ema2 : na, "EMA slow", color = color.new(color.orange, 0),            linewidth = 1)
-pU = plot(showBB ? bbBase + bbDev : na, "BB upper", color = color.new(color.gray, 50))
-pL = plot(showBB ? bbBase - bbDev : na, "BB lower", color = color.new(color.gray, 50))
-fill(pU, pL, color = color.new(color.gray, 92), title = "BB fill")
-plot(showBB ? bbBase : na, "BB basis", color = color.new(color.gray, 40), style = plot.style_line)
-
-// Hidden source plot: lets you apply any other indicator on this pane.
-// In the other indicator's settings choose Source = "NaatAI HA: HA Close".
+// Hidden source plot: apply any other indicator on this pane by choosing
+// Source = "NaatAI HA+PC: HA Close" in that indicator's settings.
 plot(haC, "HA Close", display = display.none, editable = false)
 
 // ---------------------------------------------------------------- signals ---
-// BUY  = Heikin Ashi is green AND PC Trend points up (fires when both first align)
-// SELL = Heikin Ashi is red   AND PC Trend points down
+// BUY  = Heiken Ashi turns/is up AND PC Trend points up (first bar both agree)
+// SELL = Heiken Ashi turns/is down AND PC Trend points down
 comboUp = haUp and (not showPct or pcUp)
 comboDn = not haUp and (not showPct or not pcUp)
-flipUp  = comboUp and not comboUp[1] and barstate.isconfirmed
-flipDn  = comboDn and not comboDn[1] and barstate.isconfirmed
-plotshape(showSig and flipUp, title = "BUY (HA + PC Trend)",  style = shape.triangleup,
-     location = location.bottom, color = colUp, size = size.tiny, text = "BUY")
-plotshape(showSig and flipDn, title = "SELL (HA + PC Trend)", style = shape.triangledown,
-     location = location.top, color = colDn, size = size.tiny, text = "SELL")
-
-// how many bars the current trend has lasted
-var int trendAge = 0
-trendAge := haUp != haUp[1] ? 1 : trendAge + 1
+buySig  = comboUp and not comboUp[1] and barstate.isconfirmed
+sellSig = comboDn and not comboDn[1] and barstate.isconfirmed
+plotshape(showSig and buySig,  title = "BUY (HA + PC Trend)",  style = shape.triangleup,
+     location = location.bottom, color = color.rgb(8, 153, 129), size = size.tiny, text = "BUY")
+plotshape(showSig and sellSig, title = "SELL (HA + PC Trend)", style = shape.triangledown,
+     location = location.top, color = color.rgb(242, 54, 69), size = size.tiny, text = "SELL")
 
 // -------------------------------------------------------------- dashboard ---
+gCol = color.rgb(8, 153, 129)
+rCol = color.rgb(242, 54, 69)
 pos = tblPos == "Top right" ? position.top_right :
      tblPos == "Top left" ? position.top_left :
      tblPos == "Bottom right" ? position.bottom_right : position.bottom_left
-var table dash = table.new(pos, 2, 5, bgcolor = color.new(chart.bg_color, 15),
+var table dash = table.new(pos, 2, 4, bgcolor = color.new(chart.bg_color, 15),
      border_color = color.new(color.gray, 60), border_width = 1)
 if showTbl and barstate.islast
     fg  = chart.fg_color
     hdr = color.new(color.rgb(66, 135, 245), 0)
-    tfTxt = haTf == "" ? timeframe.period : haTf
-    table.cell(dash, 0, 0, "Heikin Ashi", text_color = hdr, text_size = size.small)
-    table.cell(dash, 1, 0, tfTxt,         text_color = hdr, text_size = size.small)
-    table.cell(dash, 0, 1, "HA trend",    text_color = fg,  text_size = size.small)
-    table.cell(dash, 1, 1, haUp ? "UP" : "DOWN",
-         text_color = haUp ? colUp : colDn, text_size = size.small)
-    table.cell(dash, 0, 2, "PC Trend",    text_color = fg,  text_size = size.small)
-    table.cell(dash, 1, 2, pcUp ? "UP" : "DOWN", text_color = pcCol, text_size = size.small)
-    table.cell(dash, 0, 3, "Trend age",   text_color = fg,  text_size = size.small)
-    table.cell(dash, 1, 3, str.tostring(trendAge) + " bars", text_color = fg, text_size = size.small)
-    table.cell(dash, 0, 4, "RSI(" + str.tostring(rsiLen) + ")", text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 4, str.tostring(rsiHa, "#.#"),
-         text_color = rsiHa > 70 ? colDn : rsiHa < 30 ? colUp : fg, text_size = size.small)
+    table.cell(dash, 0, 0, "HA + PC Trend", text_color = hdr, text_size = size.small)
+    table.cell(dash, 1, 0, haTf == "" ? timeframe.period : haTf, text_color = hdr, text_size = size.small)
+    table.cell(dash, 0, 1, "Heiken Ashi", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 1, haUp ? "UP" : "DOWN", text_color = haUp ? gCol : rCol, text_size = size.small)
+    table.cell(dash, 0, 2, "PC Trend", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 2, pcUp ? "UP" : "DOWN", text_color = pcUp ? gCol : rCol, text_size = size.small)
+    stTxt = comboUp ? "LONG" : comboDn ? "SHORT" : "MIXED"
+    table.cell(dash, 0, 3, "State", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 3, stTxt,
+         text_color = comboUp ? gCol : comboDn ? rCol : color.gray, text_size = size.small)
 
 // ------------------------------------------------------------------ alerts ---
-alertcondition(flipUp, "NaatAI HA BUY",  "Heikin Ashi + PC Trend aligned UP")
-alertcondition(flipDn, "NaatAI HA SELL", "Heikin Ashi + PC Trend aligned DOWN")
-alertcondition(pcUp and not pcUp[1],     "PC Trend flip UP",   "PC Trend line turned up (blue)")
-alertcondition(not pcUp and pcUp[1],     "PC Trend flip DOWN", "PC Trend line turned down (orange)")
+alertcondition(buySig,  "HA+PC BUY",  "Heiken Ashi + PC Trend aligned UP")
+alertcondition(sellSig, "HA+PC SELL", "Heiken Ashi + PC Trend aligned DOWN")
+alertcondition(pcUp and not pcUp[1],   "PC Trend flip UP",   "PC Trend line turned up")
+alertcondition(not pcUp and pcUp[1],   "PC Trend flip DOWN", "PC Trend line turned down")
