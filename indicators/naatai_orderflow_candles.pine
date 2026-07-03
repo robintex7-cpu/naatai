@@ -1,50 +1,74 @@
 //@version=6
-// NaatAI OrderFlow Candles
-// ------------------------
-// A candle-replacement indicator inspired by footprint / orderflow charts.
-// Features:
-//   * Custom delta-colored candles (hide the chart's own candles to "replace" them)
-//   * Real-time buy volume / sell volume / delta per candle (lower-timeframe based)
-//   * Footprint cells inside each candle with buy/sell imbalance highlighting
-//   * Next-candle probability (bullish %) from an adaptive statistics engine
-//   * RSI value, auto Fibonacci retracement levels + nearest level readout
-//   * BUY / SELL signals with alerts
+// NaatAI OrderFlow Candles v3
+// ---------------------------
+// Candle-replacement orderflow indicator.
+//   * Volume-split candles: green part = buy volume share, red = sell share
+//     (or classic delta-colored candles — switchable)
+//   * Real-time buy/sell volume, delta and next-candle probability per bar
+//   * Footprint cells with imbalance highlighting
+//   * Auto support/resistance lines (pivots) + auto Fibonacci levels
+//   * Non-repainting BUY/SELL signals (confirmed at close) with SL/TP labels
+//   * Auto lower-TF volume engine and auto higher-TF trend filter — works on
+//     every chart timeframe without re-tuning
+//   * Left-side screener: watches your list of Binance pairs and shows which
+//     ones have a BUY or SELL state right now
 indicator("NaatAI OrderFlow Candles", "NaatAI OFC", overlay = true,
      max_labels_count = 500, max_boxes_count = 500, max_lines_count = 100)
 
 // ---------------------------------------------------------------- inputs ---
 grpVol   = "Volume engine"
 ltfIn    = input.timeframe("", "Lower timeframe (blank = auto)", group = grpVol,
-     tooltip = "Intrabar timeframe used to split volume into buy/sell. Leave blank to pick automatically from the chart timeframe.")
+     tooltip = "Intrabar timeframe used to split volume into buy/sell. Blank = picked automatically from the chart timeframe.")
 grpCndl  = "Candles & footprint"
+cndlMode = input.string("Volume split", "Candle style", group = grpCndl,
+     options = ["Volume split", "Delta candles"],
+     tooltip = "Volume split: each bar shows buy volume (green, from the low) vs sell volume (red, to the high). Delta candles: normal candles colored by delta.")
 showFp   = input.bool(true,  "Show footprint cells",        group = grpCndl)
 fpBars   = input.int(14,     "Footprint: last N bars",      group = grpCndl, minval = 2,  maxval = 60)
 fpRows   = input.int(3,      "Footprint: rows per candle",  group = grpCndl, minval = 2,  maxval = 8)
-fpFill   = input.bool(false, "Fill footprint cells",        group = grpCndl,
-     tooltip = "Off = clean text-only numbers like a classic footprint chart. On = shaded green/red cell backgrounds.")
-imbRatio = input.float(3.0,  "Imbalance ratio (x)",         group = grpCndl, minval = 1.5, step = 0.5,
-     tooltip = "A footprint cell is highlighted orange when one side's volume is at least this many times the other side's.")
-showLbl  = input.bool(true,  "Show volume/delta labels",    group = grpCndl)
+fpFill   = input.bool(false, "Fill footprint cells",        group = grpCndl)
+imbRatio = input.float(3.0,  "Imbalance ratio (x)",         group = grpCndl, minval = 1.5, step = 0.5)
+showLbl  = input.bool(true,  "Show volume/probability labels", group = grpCndl)
 lblBars  = input.int(20,     "Labels: last N bars",         group = grpCndl, minval = 2, maxval = 120)
 grpSig   = "Signals & probability"
 rsiLen   = input.int(14,     "RSI length",                  group = grpSig, minval = 2)
 emaFLen  = input.int(21,     "Fast EMA",                    group = grpSig, minval = 2)
 emaSLen  = input.int(50,     "Slow EMA",                    group = grpSig, minval = 3)
 probThr  = input.int(65,     "Signal probability threshold %", group = grpSig, minval = 50, maxval = 95)
-dpThr    = input.float(15,   "Min |delta| % to confirm",       group = grpSig, minval = 0, maxval = 60,
-     tooltip = "A signal needs at least this much one-sided volume dominance in the candle. Higher = fewer, stronger signals.")
+dpThr    = input.float(15,   "Min |delta| % to confirm",       group = grpSig, minval = 0, maxval = 60)
 sigGap   = input.int(10,     "Min bars between signals",       group = grpSig, minval = 0)
 useHtf   = input.bool(true,  "Higher-timeframe trend filter",  group = grpSig, inline = "htf")
-htfTf    = input.timeframe("240", "",                          group = grpSig, inline = "htf")
+htfIn    = input.timeframe("", "",                             group = grpSig, inline = "htf",
+     tooltip = "Blank = picked automatically (e.g. chart 15m -> HTF 4h).")
 htfLen   = input.int(50,     "HTF EMA length",                 group = grpSig, minval = 5)
 showRisk = input.bool(true,  "Show SL/TP on signals",          group = grpSig)
 rrRatio  = input.float(2.0,  "Take-profit R:R",                group = grpSig, minval = 0.5, step = 0.5)
+grpSr    = "Support / Resistance"
+showSr   = input.bool(true,  "Show support/resistance lines", group = grpSr)
+srLen    = input.int(10,     "Pivot strength (bars)",  group = grpSr, minval = 2,
+     tooltip = "A pivot needs this many lower highs / higher lows on each side. Bigger = stronger, fewer levels.")
+srCount  = input.int(3,      "Levels per side",        group = grpSr, minval = 1, maxval = 5)
 grpFib   = "Fibonacci"
-showFib  = input.bool(true,  "Show fibonacci levels",       group = grpFib)
-fibLen   = input.int(120,    "Swing lookback (bars)",       group = grpFib, minval = 20)
+showFib  = input.bool(true,  "Show fibonacci levels",  group = grpFib)
+fibLen   = input.int(120,    "Swing lookback (bars)",  group = grpFib, minval = 20)
 grpUi    = "Dashboard"
 tblPos   = input.string("Top right", "Dashboard position", group = grpUi,
      options = ["Top right", "Top left", "Bottom right", "Bottom left"])
+grpScr   = "Binance screener (left side)"
+showScr  = input.bool(true, "Show pair screener", group = grpScr,
+     tooltip = "Watches these pairs on the chart timeframe and shows which have a BUY/SELL state right now. Edit the list to any Binance pairs you like.")
+sym01 = input.symbol("BINANCE:BTCUSDT",  "1",  group = grpScr, inline = "sa")
+sym02 = input.symbol("BINANCE:ETHUSDT",  "2",  group = grpScr, inline = "sa")
+sym03 = input.symbol("BINANCE:BNBUSDT",  "3",  group = grpScr, inline = "sb")
+sym04 = input.symbol("BINANCE:SOLUSDT",  "4",  group = grpScr, inline = "sb")
+sym05 = input.symbol("BINANCE:XRPUSDT",  "5",  group = grpScr, inline = "sc")
+sym06 = input.symbol("BINANCE:DOGEUSDT", "6",  group = grpScr, inline = "sc")
+sym07 = input.symbol("BINANCE:ADAUSDT",  "7",  group = grpScr, inline = "sd")
+sym08 = input.symbol("BINANCE:AVAXUSDT", "8",  group = grpScr, inline = "sd")
+sym09 = input.symbol("BINANCE:LINKUSDT", "9",  group = grpScr, inline = "se")
+sym10 = input.symbol("BINANCE:DOTUSDT",  "10", group = grpScr, inline = "se")
+sym11 = input.symbol("BINANCE:LTCUSDT",  "11", group = grpScr, inline = "sf")
+sym12 = input.symbol("BINANCE:NEARUSDT", "12", group = grpScr, inline = "sf")
 
 // ------------------------------------------------------------- utilities ---
 fmtVol(float v) =>
@@ -58,7 +82,12 @@ autoLtf() =>
     s = timeframe.in_seconds(timeframe.period)
     s >= 86400 ? "30" : s >= 14400 ? "15" : s >= 3600 ? "5" : s >= 300 ? "1" : timeframe.period
 
+autoHtf() =>
+    s = timeframe.in_seconds(timeframe.period)
+    s <= 300 ? "60" : s <= 3600 ? "240" : s <= 14400 ? "D" : "W"
+
 ltf = ltfIn == "" ? autoLtf() : ltfIn
+htf = htfIn == "" ? autoHtf() : htfIn
 
 // ------------------------------------------------- buy / sell volume (LTF) ---
 [ltfO, ltfC, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [open, close, volume])
@@ -77,7 +106,6 @@ if haveLtf
             buyVol  += v / 2
             sellVol += v / 2
 else
-    // fallback: approximate pressure from where the close sits in the range
     rng = high - low
     bp  = rng > 0 ? (close - low) / rng : 0.5
     buyVol  := nz(volume) * bp
@@ -96,8 +124,6 @@ emaF = ta.ema(close, emaFLen)
 emaS = ta.ema(close, emaSLen)
 
 // -------------------------------------------------- next-candle probability ---
-// Adaptive engine: bucket every bar into a state (delta sign x RSI zone x trend)
-// and track how often the NEXT bar closed up from that state.
 dSign = delta > 0 ? 1 : 0
 rZone = rsi < 40 ? 0 : rsi > 60 ? 2 : 1
 tSign = emaF > emaS ? 1 : 0
@@ -113,7 +139,7 @@ if barstate.isconfirmed
             array.set(stUp, prevState, array.get(stUp, prevState) + 1)
     prevState := state
 
-histP    = (array.get(stUp, state) + 1.0) / (array.get(stTotal, state) + 2.0)  // Laplace-smoothed
+histP    = (array.get(stUp, state) + 1.0) / (array.get(stTotal, state) + 2.0)
 deltaSc  = totVol > 0 ? buyVol / totVol : 0.5
 rsiSc    = math.max(0.0, math.min(1.0, rsi / 100))
 atrVal   = ta.atr(14)
@@ -122,12 +148,50 @@ probUp   = 100 * (0.45 * histP + 0.30 * deltaSc + 0.15 * rsiSc + 0.10 * trendSc)
 probUp  := math.max(1, math.min(99, probUp))
 probDown = 100 - probUp
 
+// ------------------------------------------------- support / resistance ---
+ph = ta.pivothigh(high, srLen, srLen)
+pl = ta.pivotlow(low,  srLen, srLen)
+var float[] resLv = array.new_float()
+var float[] supLv = array.new_float()
+if not na(ph) and barstate.isconfirmed
+    array.unshift(resLv, ph)
+    if array.size(resLv) > srCount
+        array.pop(resLv)
+if not na(pl) and barstate.isconfirmed
+    array.unshift(supLv, pl)
+    if array.size(supLv) > srCount
+        array.pop(supLv)
+
+var line[]  srLines  = array.new_line()
+var label[] srLabels = array.new_label()
+if showSr and barstate.islast
+    while array.size(srLines) > 0
+        line.delete(array.pop(srLines))
+    while array.size(srLabels) > 0
+        label.delete(array.pop(srLabels))
+    if array.size(resLv) > 0
+        for i = 0 to array.size(resLv) - 1
+            p = array.get(resLv, i)
+            array.push(srLines, line.new(math.max(0, bar_index - 80), p, bar_index + 8, p,
+                 color = color.new(color.rgb(242, 54, 69), i * 15), width = i == 0 ? 2 : 1))
+            if i == 0
+                array.push(srLabels, label.new(bar_index + 8, p, "R " + str.tostring(p, format.mintick),
+                     style = label.style_none, textcolor = color.rgb(242, 54, 69), size = size.small))
+    if array.size(supLv) > 0
+        for i = 0 to array.size(supLv) - 1
+            p = array.get(supLv, i)
+            array.push(srLines, line.new(math.max(0, bar_index - 80), p, bar_index + 8, p,
+                 color = color.new(color.rgb(8, 153, 129), i * 15), width = i == 0 ? 2 : 1))
+            if i == 0
+                array.push(srLabels, label.new(bar_index + 8, p, "S " + str.tostring(p, format.mintick),
+                     style = label.style_none, textcolor = color.rgb(8, 153, 129), size = size.small))
+
 // ------------------------------------------------------------- fibonacci ---
 hh    = ta.highest(high, fibLen)
 ll    = ta.lowest(low,  fibLen)
-hhBar = ta.highestbars(high, fibLen)  // 0 or negative offset
+hhBar = ta.highestbars(high, fibLen)
 llBar = ta.lowestbars(low,  fibLen)
-upSwing = hhBar > llBar               // high is more recent -> retrace down from it
+upSwing = hhBar > llBar
 fibRange = hh - ll
 fibAt(float r) => upSwing ? hh - fibRange * r : ll + fibRange * r
 
@@ -147,7 +211,6 @@ for i = 0 to array.size(fibRatios) - 1
 var line[]  fibLines  = array.new_line()
 var label[] fibLabels = array.new_label()
 if showFib and barstate.islast
-    // (re)draw levels once per update
     while array.size(fibLines) > 0
         line.delete(array.pop(fibLines))
     while array.size(fibLabels) > 0
@@ -163,8 +226,7 @@ if showFib and barstate.islast
              style = label.style_none, textcolor = col, size = size.small))
 
 // ----------------------------------------------------------- signal logic ---
-// Higher-timeframe trend filter (non-repainting: uses the last CLOSED HTF bar)
-htfEma    = request.security(syminfo.tickerid, htfTf, ta.ema(close, htfLen)[1],
+htfEma    = request.security(syminfo.tickerid, htf, ta.ema(close, htfLen)[1],
      lookahead = barmerge.lookahead_on)
 htfBull   = close > htfEma
 htfOkBuy  = not useHtf or htfBull
@@ -174,8 +236,6 @@ strongDelta = math.abs(deltaPct) >= dpThr
 buyCond  = probUp   >= probThr and delta > 0 and strongDelta and rsi > 40 and rsi < 75 and emaF > emaS and htfOkBuy
 sellCond = probDown >= probThr and delta < 0 and strongDelta and rsi < 60 and rsi > 25 and emaF < emaS and htfOkSell
 
-// Non-repainting: a signal only prints when the candle CLOSES with the
-// conditions met, and never twice within `sigGap` bars.
 var int lastSigBar = -100000
 canSig  = bar_index - lastSigBar >= sigGap
 buySig  = buyCond  and not buyCond[1]  and canSig and barstate.isconfirmed
@@ -183,7 +243,6 @@ sellSig = sellCond and not sellCond[1] and canSig and barstate.isconfirmed
 if buySig or sellSig
     lastSigBar := bar_index
 
-// Suggested stop-loss / take-profit (ATR based) drawn at each signal
 var label[] riskLabels = array.new_label()
 if showRisk and (buySig or sellSig)
     slDist = 1.5 * atrVal
@@ -203,13 +262,23 @@ if showRisk and (buySig or sellSig)
 // -------------------------------------------------------- candle painting ---
 colBuy    = color.rgb(8, 153, 129)
 colSell   = color.rgb(242, 54, 69)
-strength  = math.min(math.abs(deltaPct), 60) / 60          // 0..1
+isSplit   = cndlMode == "Volume split"
+
+// classic delta candles (only in "Delta candles" mode)
+strength  = math.min(math.abs(deltaPct), 60) / 60
 bodyCol   = delta >= 0 ?
      color.new(colBuy,  int(55 - 45 * strength)) :
      color.new(colSell, int(55 - 45 * strength))
 edgeCol   = delta >= 0 ? colBuy : colSell
-plotcandle(open, high, low, close, title = "OrderFlow candles",
-     color = bodyCol, wickcolor = edgeCol, bordercolor = edgeCol)
+plotcandle(isSplit ? na : open, isSplit ? na : high, isSplit ? na : low, isSplit ? na : close,
+     title = "Delta candles", color = bodyCol, wickcolor = edgeCol, bordercolor = edgeCol)
+
+// volume-split candles: green body = buy share of the bar's range, red = sell
+buyTop = low + (high - low) * (totVol > 0 ? buyVol / totVol : 0.5)
+plotcandle(isSplit ? low : na, isSplit ? buyTop : na, isSplit ? low : na, isSplit ? buyTop : na,
+     title = "Buy volume part", color = color.new(colBuy, 15), wickcolor = colBuy, bordercolor = colBuy)
+plotcandle(isSplit ? buyTop : na, isSplit ? high : na, isSplit ? buyTop : na, isSplit ? high : na,
+     title = "Sell volume part", color = color.new(colSell, 15), wickcolor = colSell, bordercolor = colSell)
 
 plotshape(buySig,  title = "BUY signal",  style = shape.triangleup,
      location = location.belowbar, color = colBuy,  size = size.small, text = "BUY")
@@ -253,22 +322,77 @@ if showFp and barstate.isconfirmed and haveLtf
 // ------------------------------------------------- per-candle info labels ---
 var label[] volLabels = array.new_label()
 if showLbl and barstate.isconfirmed
-    txtTop = "V:" + fmtVol(totVol) + "\nH-L:" + str.tostring(high - low, format.mintick)
+    txtTop = "B:" + fmtVol(buyVol) + "\nS:" + fmtVol(sellVol)
     array.push(volLabels, label.new(bar_index, high, txtTop,
          style = label.style_none, textcolor = color.new(color.rgb(66, 135, 245), 10),
          size = size.tiny, yloc = yloc.abovebar))
-    txtBot = (delta >= 0 ? "+" : "") + fmtVol(delta)
+    txtBot = (delta >= 0 ? "+" : "") + fmtVol(delta) + "\n" +
+         (probUp >= 50 ? "▲" + str.tostring(probUp, "#") : "▼" + str.tostring(probDown, "#")) + "%"
     array.push(volLabels, label.new(bar_index, low, txtBot,
          style = label.style_none, textcolor = delta >= 0 ? colBuy : colSell,
          size = size.tiny, yloc = yloc.belowbar))
     while array.size(volLabels) > lblBars * 2
         label.delete(array.shift(volLabels))
 
+// ------------------------------------------------------ screener (left) ---
+// Simplified per-pair state on the chart timeframe: trend (EMA), RSI zone and
+// close-location volume pressure. 1 = BUY state, -1 = SELL state, 0 = wait.
+screenState() =>
+    eF  = ta.ema(close, emaFLen)
+    eS  = ta.ema(close, emaSLen)
+    r   = ta.rsi(close, rsiLen)
+    rg  = high - low
+    bp  = rg > 0 ? (close - low) / rg : 0.5
+    dP  = (2 * bp - 1) * 100
+    b   = dP >= dpThr and r > 40 and r < 75 and eF > eS
+    sS  = dP <= -dpThr and r < 60 and r > 25 and eF < eS
+    b ? 1 : sS ? -1 : 0
+
+sc01 = request.security(sym01, timeframe.period, screenState())
+sc02 = request.security(sym02, timeframe.period, screenState())
+sc03 = request.security(sym03, timeframe.period, screenState())
+sc04 = request.security(sym04, timeframe.period, screenState())
+sc05 = request.security(sym05, timeframe.period, screenState())
+sc06 = request.security(sym06, timeframe.period, screenState())
+sc07 = request.security(sym07, timeframe.period, screenState())
+sc08 = request.security(sym08, timeframe.period, screenState())
+sc09 = request.security(sym09, timeframe.period, screenState())
+sc10 = request.security(sym10, timeframe.period, screenState())
+sc11 = request.security(sym11, timeframe.period, screenState())
+sc12 = request.security(sym12, timeframe.period, screenState())
+
+var table scr = table.new(position.middle_left, 2, 13, bgcolor = color.new(chart.bg_color, 15),
+     border_color = color.new(color.gray, 60), border_width = 1)
+scRow(int row, string sym, int st) =>
+    if showScr and barstate.islast
+        nm = str.replace(sym, "BINANCE:", "")
+        table.cell(scr, 0, row, nm, text_color = chart.fg_color, text_size = size.tiny)
+        stTxt = st == 1 ? "BUY" : st == -1 ? "SELL" : "—"
+        stCol = st == 1 ? color.rgb(8, 153, 129) : st == -1 ? color.rgb(242, 54, 69) : color.gray
+        table.cell(scr, 1, row, stTxt, text_color = color.white, text_size = size.tiny,
+             bgcolor = st == 0 ? color.new(color.gray, 80) : color.new(stCol, 25))
+
+if showScr and barstate.islast
+    table.cell(scr, 0, 0, "Screener", text_color = color.rgb(66, 135, 245), text_size = size.tiny)
+    table.cell(scr, 1, 0, timeframe.period, text_color = color.rgb(66, 135, 245), text_size = size.tiny)
+scRow(1,  sym01, sc01)
+scRow(2,  sym02, sc02)
+scRow(3,  sym03, sc03)
+scRow(4,  sym04, sc04)
+scRow(5,  sym05, sc05)
+scRow(6,  sym06, sc06)
+scRow(7,  sym07, sc07)
+scRow(8,  sym08, sc08)
+scRow(9,  sym09, sc09)
+scRow(10, sym10, sc10)
+scRow(11, sym11, sc11)
+scRow(12, sym12, sc12)
+
 // -------------------------------------------------------------- dashboard ---
 pos = tblPos == "Top right" ? position.top_right :
      tblPos == "Top left" ? position.top_left :
      tblPos == "Bottom right" ? position.bottom_right : position.bottom_left
-var table dash = table.new(pos, 2, 10, bgcolor = color.new(chart.bg_color, 15),
+var table dash = table.new(pos, 2, 11, bgcolor = color.new(chart.bg_color, 15),
      border_color = color.new(color.gray, 60), border_width = 1)
 if barstate.islast
     hdr = color.new(color.rgb(66, 135, 245), 0)
@@ -288,17 +412,21 @@ if barstate.islast
     table.cell(dash, 0, 5, "RSI(" + str.tostring(rsiLen) + ")", text_color = fg, text_size = size.small)
     table.cell(dash, 1, 5, str.tostring(rsi, "#.#"),
          text_color = rsi > 70 ? colSell : rsi < 30 ? colBuy : fg, text_size = size.small)
-    table.cell(dash, 0, 6, "Fib " + str.tostring(nearFibRatio, "#.###"), text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 6, str.tostring(nearFibPrice, format.mintick), text_color = color.teal, text_size = size.small)
-    table.cell(dash, 0, 7, "Next candle", text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 7, "▲ " + str.tostring(probUp, "#") + "%   ▼ " + str.tostring(probDown, "#") + "%",
+    table.cell(dash, 0, 6, "Support",    text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 6, array.size(supLv) > 0 ? str.tostring(array.get(supLv, 0), format.mintick) : "—",
+         text_color = colBuy, text_size = size.small)
+    table.cell(dash, 0, 7, "Resistance", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 7, array.size(resLv) > 0 ? str.tostring(array.get(resLv, 0), format.mintick) : "—",
+         text_color = colSell, text_size = size.small)
+    table.cell(dash, 0, 8, "Next candle", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 8, "▲ " + str.tostring(probUp, "#") + "%   ▼ " + str.tostring(probDown, "#") + "%",
          text_color = probUp >= 50 ? colBuy : colSell, text_size = size.small)
-    table.cell(dash, 0, 8, "HTF trend (" + htfTf + ")", text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 8, htfBull ? "UP" : "DOWN",
+    table.cell(dash, 0, 9, "HTF trend (" + htf + ")", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 9, htfBull ? "UP" : "DOWN",
          text_color = htfBull ? colBuy : colSell, text_size = size.small)
     sigTxt = buyCond ? "BUY" : sellCond ? "SELL" : "WAIT"
-    table.cell(dash, 0, 9, "Signal", text_color = fg, text_size = size.small)
-    table.cell(dash, 1, 9, sigTxt,
+    table.cell(dash, 0, 10, "Signal", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 10, sigTxt,
          text_color = buyCond ? colBuy : sellCond ? colSell : color.gray, text_size = size.small)
 
 // ------------------------------------------------------------------ alerts ---
