@@ -1,0 +1,206 @@
+//@version=5
+// naatai · Order-Flow Chart — Pine Script port of docs/chart.html
+//
+// One script, two modes (add it twice for the full layout):
+//   1) "Chart overlay"    — EMAs, session VWAP, institutional supply/demand
+//      zones, CVD divergence marks, absorption markers, bias table, alerts.
+//   2) "CVD + delta pane" — add the indicator a second time, pick this mode,
+//      then right-click it → "Move to" → "New pane below" to get the CVD line
+//      and per-candle delta columns in their own pane with their own scale.
+//
+// Delta here is computed from lower-timeframe candles (default 1-minute):
+// up-volume minus down-volume — the closest non-lagging order-flow proxy
+// TradingView offers without exchange taker data.
+indicator("naatai · Order-Flow Chart", "naatai OF", overlay=true,
+     max_boxes_count=100, max_labels_count=200, max_lines_count=100)
+
+// ─────────────────────────── Inputs ───────────────────────────
+mode      = input.string("Chart overlay", "Mode",
+     options=["Chart overlay", "CVD + delta pane"])
+paneMode  = mode == "CVD + delta pane"
+
+grpT      = "Trend layer"
+showEMA   = input.bool(true, "EMA 20 / 50 / 200",  group=grpT)
+showVWAP  = input.bool(true, "Session VWAP",       group=grpT)
+
+grpZ      = "Institutional zones"
+showZones = input.bool(true, "Supply / demand zones",                 group=grpZ)
+pivLen    = input.int(8,     "Zone pivot length",   minval=3, maxval=25, group=grpZ)
+volMult   = input.float(1.15,"Volume spike (× 50-bar average)", step=0.05, group=grpZ)
+maxZones  = input.int(4,     "Max zones per side",  minval=1, maxval=10,  group=grpZ)
+
+grpD      = "Order flow"
+lowerTf   = input.timeframe("1", "Lower timeframe for delta", group=grpD)
+divLen    = input.int(5,     "Divergence pivot length", minval=3, maxval=15, group=grpD)
+showAbs   = input.bool(true, "Absorption markers",   group=grpD)
+
+grpB      = "Bias"
+showTable = input.bool(true, "Show bias table",      group=grpB)
+
+// ─────────────────────────── Trend layer ───────────────────────────
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+vwap   = ta.vwap(hlc3)
+
+plot(not paneMode and showEMA  ? ema20  : na, "EMA 20",  color=#3987e5, linewidth=1)
+plot(not paneMode and showEMA  ? ema50  : na, "EMA 50",  color=#c98500, linewidth=1)
+plot(not paneMode and showEMA  ? ema200 : na, "EMA 200", color=#8b7cf0, linewidth=2)
+plot(not paneMode and showVWAP ? vwap   : na, "VWAP",    color=#d55181, linewidth=1,
+     style=plot.style_circles)
+
+// ───────────── Delta & CVD (lower-timeframe up/down volume) ─────────────
+dArr  = request.security_lower_tf(syminfo.tickerid, lowerTf,
+     close > open ? volume : close < open ? -volume : 0.0)
+// fallback to chart-candle direction when intrabars aren't available (old bars)
+float delta = array.size(dArr) > 0 ? array.sum(dArr) :
+     close > open ? volume : close < open ? -volume : 0.0
+cvd = ta.cum(delta)
+
+// pane-mode plots (move this instance to its own pane)
+plot(paneMode ? cvd : na, "CVD", color=#3987e5, linewidth=2)
+plot(paneMode ? delta : na, "Delta", style=plot.style_columns,
+     color=delta >= 0 ? color.new(#2ecc71, 25) : color.new(#ff5c5c, 25))
+hline(0, "Zero", color=color.new(color.gray, 60), display=paneMode ? display.all : display.none)
+
+// ───────────────────── CVD divergence detection ─────────────────────
+ph = ta.pivothigh(high, divLen, divLen)
+pl = ta.pivotlow(low,  divLen, divLen)
+var float phPrice = na
+var float phCvd   = na
+var float plPrice = na
+var float plCvd   = na
+bearDiv = false
+bullDiv = false
+if not na(ph)
+    if not na(phPrice) and ph > phPrice and cvd[divLen] < phCvd
+        bearDiv := true
+    phPrice := ph
+    phCvd   := cvd[divLen]
+if not na(pl)
+    if not na(plPrice) and pl < plPrice and cvd[divLen] > plCvd
+        bullDiv := true
+    plPrice := pl
+    plCvd   := cvd[divLen]
+
+plotshape(not paneMode and bearDiv, "Bearish CVD divergence", shape.triangledown,
+     location.abovebar, color.new(#ff5c5c, 0), offset=-divLen, size=size.small, text="div")
+plotshape(not paneMode and bullDiv, "Bullish CVD divergence", shape.triangleup,
+     location.belowbar, color.new(#2ecc71, 0), offset=-divLen, size=size.small, text="div")
+
+// ───────────── Institutional zones (high-volume swing pivots) ─────────────
+volAvg = ta.sma(volume, 50)
+var box[] supBoxes = array.new<box>()
+var box[] demBoxes = array.new<box>()
+
+if not paneMode and showZones and not na(ph) and volume[pivLen] > volMult * volAvg[pivLen]
+    top = high[pivLen]
+    bot = math.max(open[pivLen], close[pivLen])
+    if top > bot
+        array.push(supBoxes, box.new(bar_index - pivLen, top, bar_index, bot,
+             border_color=color.new(#ff5c5c, 55), bgcolor=color.new(#ff5c5c, 88),
+             extend=extend.right, text="SUPPLY", text_color=color.new(#ff5c5c, 25),
+             text_size=size.tiny, text_halign=text.align_left))
+        if array.size(supBoxes) > maxZones
+            box.delete(array.shift(supBoxes))
+if not paneMode and showZones and not na(pl) and volume[pivLen] > volMult * volAvg[pivLen]
+    top = math.min(open[pivLen], close[pivLen])
+    bot = low[pivLen]
+    if top > bot
+        array.push(demBoxes, box.new(bar_index - pivLen, top, bar_index, bot,
+             border_color=color.new(#2ecc71, 55), bgcolor=color.new(#2ecc71, 88),
+             extend=extend.right, text="DEMAND", text_color=color.new(#2ecc71, 25),
+             text_size=size.tiny, text_halign=text.align_left))
+        if array.size(demBoxes) > maxZones
+            box.delete(array.shift(demBoxes))
+
+// drop broken zones (close pushed through the far side)
+if array.size(supBoxes) > 0
+    for i = array.size(supBoxes) - 1 to 0
+        bx = array.get(supBoxes, i)
+        if close > box.get_top(bx) * 1.0015
+            box.delete(bx)
+            array.remove(supBoxes, i)
+if array.size(demBoxes) > 0
+    for i = array.size(demBoxes) - 1 to 0
+        bx = array.get(demBoxes, i)
+        if close < box.get_bottom(bx) * 0.9985
+            box.delete(bx)
+            array.remove(demBoxes, i)
+
+// is price currently inside a zone?
+inSupply = false
+inDemand = false
+if array.size(supBoxes) > 0
+    for i = 0 to array.size(supBoxes) - 1
+        bx = array.get(supBoxes, i)
+        if high >= box.get_bottom(bx) and low <= box.get_top(bx)
+            inSupply := true
+if array.size(demBoxes) > 0
+    for i = 0 to array.size(demBoxes) - 1
+        bx = array.get(demBoxes, i)
+        if high >= box.get_bottom(bx) and low <= box.get_top(bx)
+            inDemand := true
+
+// ───────────────────── Absorption markers ─────────────────────
+// Sellers hit hard (negative delta) but price closed up on big volume →
+// passive buyers absorbed them (bullish). Mirror case is bearish.
+bigVol     = volume > volAvg * volMult
+absorbBull = showAbs and delta < 0 and close >= open and bigVol
+absorbBear = showAbs and delta > 0 and close <= open and bigVol
+plotshape(not paneMode and absorbBull, "Buy absorption", shape.diamond,
+     location.belowbar, color.new(#2ecc71, 20), size=size.tiny)
+plotshape(not paneMode and absorbBear, "Sell absorption", shape.diamond,
+     location.abovebar, color.new(#ff5c5c, 20), size=size.tiny)
+
+// ─────────────────────────── Bias engine ───────────────────────────
+trendS   = close > ema20 and ema20 > ema50 and ema50 > ema200 ? 2 :
+           close < ema20 and ema20 < ema50 and ema50 < ema200 ? -2 :
+           close > ema200 ? 1 : -1
+vwapS    = close >= vwap ? 1 : -1
+cvdSlope = cvd - cvd[10]
+flowS    = (delta > 0 ? 1 : -1) + (cvdSlope > 0 ? 1 : -1)
+bullRec  = nz(ta.barssince(bullDiv), 99999) <= 30
+bearRec  = nz(ta.barssince(bearDiv), 99999) <= 30
+divS     = bullRec and not bearRec ? 2 : bearRec and not bullRec ? -2 : 0
+zoneS    = inDemand and not inSupply ? 1 : inSupply and not inDemand ? -1 : 0
+total    = trendS + vwapS + flowS + divS + zoneS      // range ≈ -8 … +8
+bias     = total >= 4 ? "LONG" : total <= -4 ? "SHORT" : "WAIT"
+biasCol  = total >= 4 ? #2ecc71 : total <= -4 ? #ff5c5c : #f5a623
+
+// ─────────────────────────── Bias table ───────────────────────────
+var table tbl = table.new(position.top_right, 2, 7, bgcolor=color.new(#131823, 10),
+     border_color=color.new(#232b3a, 0), border_width=1)
+if barstate.islast and showTable and not paneMode
+    txtCol = color.new(#e6edf3, 0)
+    mutCol = color.new(#8b98a9, 0)
+    up     = color.new(#2ecc71, 0)
+    dn     = color.new(#ff5c5c, 0)
+    table.cell(tbl, 0, 0, "naatai bias", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 0, bias, text_color=biasCol, text_size=size.normal)
+    table.cell(tbl, 0, 1, "Trend", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 1, trendS > 0 ? "Up" : "Down", text_color=trendS > 0 ? up : dn, text_size=size.small)
+    table.cell(tbl, 0, 2, "VWAP", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 2, vwapS > 0 ? "Above" : "Below", text_color=vwapS > 0 ? up : dn, text_size=size.small)
+    table.cell(tbl, 0, 3, "Candle Δ", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(delta, format.volume), text_color=delta >= 0 ? up : dn, text_size=size.small)
+    table.cell(tbl, 0, 4, "CVD 10-bar", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 4, cvdSlope >= 0 ? "Rising" : "Falling", text_color=cvdSlope >= 0 ? up : dn, text_size=size.small)
+    table.cell(tbl, 0, 5, "Divergence", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 5, bullRec ? "Bullish" : bearRec ? "Bearish" : "None",
+         text_color=bullRec ? up : bearRec ? dn : txtCol, text_size=size.small)
+    table.cell(tbl, 0, 6, "Zone", text_color=mutCol, text_size=size.small)
+    table.cell(tbl, 1, 6, inDemand ? "In demand" : inSupply ? "In supply" : "—",
+         text_color=inDemand ? up : inSupply ? dn : txtCol, text_size=size.small)
+
+// ─────────────────────────── Alerts ───────────────────────────
+longFlip  = total >= 4 and total[1] < 4
+shortFlip = total <= -4 and total[1] > -4
+alertcondition(longFlip,  "naatai LONG bias",  "naatai: bias flipped to LONG on {{ticker}} {{interval}}")
+alertcondition(shortFlip, "naatai SHORT bias", "naatai: bias flipped to SHORT on {{ticker}} {{interval}}")
+alertcondition(bullDiv,   "Bullish CVD divergence", "naatai: bullish CVD divergence on {{ticker}} {{interval}}")
+alertcondition(bearDiv,   "Bearish CVD divergence", "naatai: bearish CVD divergence on {{ticker}} {{interval}}")
+alertcondition(absorbBull and inDemand, "Buy absorption in demand zone",
+     "naatai: sellers absorbed inside demand zone on {{ticker}} {{interval}} — possible U-turn")
+alertcondition(absorbBear and inSupply, "Sell absorption in supply zone",
+     "naatai: buyers absorbed inside supply zone on {{ticker}} {{interval}} — possible U-turn")

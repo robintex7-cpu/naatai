@@ -72,6 +72,25 @@
   .zone-row .zt { font-weight:800; font-size:11px; letter-spacing:.5px; }
   .zone-row.supply .zt { color:var(--red); } .zone-row.demand .zt { color:var(--green); }
   .zone-row .zd { color:var(--muted); font-size:11px; }
+  .gauge { height:14px; border-radius:999px; overflow:hidden; display:flex; margin:8px 0 4px; background:var(--panel2); }
+  .gauge i { display:block; height:100%; }
+  .fc-head { display:flex; align-items:baseline; justify-content:space-between; }
+  .fc-big { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .fc-dir { font-size:13px; font-weight:800; padding:3px 10px; border-radius:8px; }
+  .fc-dir.up { background:rgba(46,204,113,.14); color:var(--green); }
+  .fc-dir.dn { background:rgba(255,92,92,.14); color:var(--red); }
+  .fc-dir.wt { background:rgba(245,166,35,.14); color:var(--amber); }
+  .fc-why { margin:7px 0 0; padding-left:16px; font-size:12px; color:var(--muted); }
+  .fc-why li { margin-bottom:3px; }
+  .fc-lt { margin-top:9px; border-top:1px dashed var(--line); padding-top:7px; font-size:12.5px; }
+  .mx-row { display:grid; grid-template-columns:64px 1fr 78px; gap:8px; align-items:center;
+    padding:5px 0; border-bottom:1px dashed var(--line); font-size:12px; font-variant-numeric:tabular-nums; }
+  .mx-row:last-child { border-bottom:0; }
+  .mx-name { font-weight:700; }
+  .mx-bar { height:9px; border-radius:999px; overflow:hidden; display:flex; background:var(--panel2); }
+  .mx-bar i { display:block; height:100%; }
+  .mx-st { text-align:right; color:var(--muted); font-size:11px; }
+  .mx-st.live { color:var(--green); }
   .calc label { display:block; font-size:11px; color:var(--muted); margin:7px 0 3px; }
   .calc input { width:100%; }
   .calc .out { margin-top:10px; border-top:1px dashed var(--line); padding-top:8px; }
@@ -119,6 +138,23 @@
     </div>
 
     <div class="side">
+      <div class="card">
+        <h3>Next-move forecast</h3>
+        <div id="forecast"><span class="sub">Loading…</span></div>
+        <div class="sub" style="margin-top:7px">Probability model over live order flow + structure. It is a <b>bias</b>, not a certainty — nothing predicts the market 100%.</div>
+      </div>
+
+      <div class="card">
+        <h3>Multi-exchange order flow <span class="sub" id="mxAge"></span></h3>
+        <div id="mxRows"><span class="sub">Loading…</span></div>
+        <div id="mxConsensus"></div>
+        <div class="sub" style="margin-top:6px" id="mxNote">
+          Aggressive buy vs sell volume from recent trades on each exchange (refreshes ~20s).
+          MEXC/BingX block direct browser reads (CORS) on some networks — their row shows live status.
+          <a href="#" id="cdKeyLink">CoinDesk key</a>
+        </div>
+      </div>
+
       <div class="card">
         <h3>Institutional zones (auto-detected)</h3>
         <div id="zoneList" style="min-height:30px"></div>
@@ -176,7 +212,8 @@ const S = {
   symbol:"BTCUSDT", interval:"15m", bars:[], oi:[], oiByBar:[],
   ema20:[], ema50:[], ema200:[], vwap:[], cvd:[], delta:[],
   zones:[], profile:null, div:null, mark:null, tick24:null, lsRatio:null,
-  demo:false, ws:null, pollTimer:null, oiTimer:null,
+  demo:false, ws:null, pollTimer:null, oiTimer:null, mxTimer:null,
+  mx:{rows:[], buyPct:null, t:0}, longTerm:null, geckoIds:{},
   view:{ barW:9, right:0 }, cross:null, pxDec:2,
 };
 
@@ -192,6 +229,7 @@ const fmtSig = x => { // compact big numbers
   return x.toFixed(a<10?3:1);
 };
 function priceDecimals(p){ if(p>=1000)return 1; if(p>=100)return 2; if(p>=1)return 3; if(p>=0.01)return 5; return 7; }
+const esc = s => String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function getJSON(url, ms){
   const ac = new AbortController();
   const timer = setTimeout(()=>ac.abort(), ms||10000);
@@ -244,6 +282,7 @@ async function loadAll(){
   computeAll();
   resetView();
   renderStats(); renderChips(); renderZones(); drawAll(); calc();
+  loadLongTerm(); refreshMX();
   startLive();
 }
 
@@ -284,6 +323,199 @@ function demoData(){
   S.mark = {markPrice:p, lastFundingRate:0.0000731, nextFundingTime:Date.now()+3.2e6};
   S.tick24 = {lastPrice:p, priceChangePercent: ((p/bars[0].c-1)*100).toFixed(2), quoteVolume: 2.4e9};
   S.lsRatio = 1.7;
+}
+
+/* ================= multi-exchange order flow + forecast ================= */
+const baseCoin = () => S.symbol.replace(/(USDT|USDC|BUSD)$/,"");
+
+/* Each fetcher returns {price, buyQ, sellQ, extra} — quote-volume of aggressive
+   buys/sells in the most recent trades. Refs (CoinGecko/CoinDesk) return price only. */
+const MX_FETCHERS = {
+  Binance: async ()=>{
+    const tr = await getJSON(`${REST}/fapi/v1/aggTrades?symbol=${S.symbol}&limit=1000`, 9000);
+    if (!Array.isArray(tr) || !tr.length) throw new Error("no trades");
+    let b=0,s=0; for(const t of tr){ const q=+t.p*+t.q; t.m ? s+=q : b+=q; }
+    return {price:+tr[tr.length-1].p, buyQ:b, sellQ:s};
+  },
+  Bybit: async ()=>{
+    const j = await getJSON(`https://api.bybit.com/v5/market/recent-trade?category=linear&symbol=${S.symbol}&limit=1000`, 9000);
+    const L=j.result&&j.result.list||[]; if(!L.length) throw new Error("no trades");
+    let b=0,s=0; for(const t of L){ const q=+t.price*+t.size; t.side==="Buy"? b+=q : s+=q; }
+    return {price:+L[0].price, buyQ:b, sellQ:s};
+  },
+  MEXC: async ()=>{
+    const j = await getJSON(`https://contract.mexc.com/api/v1/contract/deals/${baseCoin()}_USDT`, 9000);
+    const L=j.data||[]; if(!L.length) throw new Error("no trades");
+    let b=0,s=0; for(const t of L){ const q=+t.p*+t.v; t.T===1? b+=q : s+=q; }
+    return {price:+L[0].p, buyQ:b, sellQ:s};
+  },
+  BingX: async ()=>{
+    const j = await getJSON(`https://open-api.bingx.com/openApi/swap/v2/quote/trades?symbol=${baseCoin()}-USDT&limit=100`, 9000);
+    // buyerMaker=true → buyer was the passive side → aggressive SELL (Binance-style semantics)
+    const L=j.data||[]; if(!L.length) throw new Error("no trades");
+    let b=0,s=0; for(const t of L){ const q=+t.price*+t.qty; t.buyerMaker? s+=q : b+=q; }
+    return {price:+L[0].price, buyQ:b, sellQ:s};
+  },
+  CoinGecko: async ()=>{
+    const base=baseCoin();
+    if (!S.geckoIds[base]){
+      const sr = await getJSON(`https://api.coingecko.com/api/v3/search?query=${base}`, 9000);
+      const hit=(sr.coins||[]).find(c=>c.symbol&&c.symbol.toUpperCase()===base.toUpperCase())||(sr.coins||[])[0];
+      if(!hit) throw new Error("coin not found");
+      S.geckoIds[base]=hit.id;
+    }
+    const id=S.geckoIds[base];
+    const j = await getJSON(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`, 9000);
+    const d=j[id]; if(!d) throw new Error("no data");
+    return {price:d.usd, buyQ:0, sellQ:0, extra:(d.usd_24h_change>=0?"+":"")+d.usd_24h_change.toFixed(2)+"% 24h"};
+  },
+  CoinDesk: async ()=>{
+    const key=localStorage.getItem("cd_key");
+    if (!key) throw new Error("key required");
+    const inst=baseCoin()+"-USD";
+    const j = await getJSON(`https://data-api.coindesk.com/index/cc/v1/latest/tick?market=cadli&instruments=${inst}&api_key=${encodeURIComponent(key)}`, 9000);
+    const d=j.Data&&j.Data[inst]; if(!d) throw new Error("no data");
+    return {price:+d.VALUE, buyQ:0, sellQ:0, extra:"index"};
+  },
+};
+
+let mxBusy=false;
+async function refreshMX(){
+  if (S.demo){ demoMX(); renderMX(); renderForecast(); return; }
+  if (mxBusy) return;
+  mxBusy=true;
+  try{ await refreshMXInner(); } finally { mxBusy=false; }
+}
+async function refreshMXInner(){
+  const names=Object.keys(MX_FETCHERS);
+  const settled = await Promise.allSettled(names.map(n=>MX_FETCHERS[n]()));
+  S.mx.rows = names.map((n,i)=>{
+    const r=settled[i];
+    if (r.status==="fulfilled") return {name:n, ...r.value, ok:true};
+    let msg=(r.reason&&r.reason.message)||"error";
+    if (/fetch|abort|network|failed/i.test(msg)) msg="no access";
+    if (msg.length>14) msg=msg.slice(0,14);
+    return {name:n, ok:false, msg};
+  });
+  const flow=S.mx.rows.filter(r=>r.ok&&(r.buyQ+r.sellQ)>0);
+  const tb=flow.reduce((a,r)=>a+r.buyQ,0), ts=flow.reduce((a,r)=>a+r.sellQ,0);
+  S.mx.buyPct = (tb+ts)>0 ? tb/(tb+ts)*100 : null;
+  S.mx.t=Date.now();
+  renderMX(); renderForecast();
+}
+function demoMX(){
+  const mk=(name,bias)=>{ const b=1e6*(1+Math.random()), s=b*(1-bias+Math.random()*.2);
+    return {name, ok:true, price:S.bars[S.bars.length-1].c*(1+(Math.random()-.5)*.0006), buyQ:b, sellQ:s}; };
+  S.mx.rows=[mk("Binance",.06),mk("Bybit",.05),mk("MEXC",.02),mk("BingX",.04),
+    {name:"CoinGecko",ok:true,price:S.bars[S.bars.length-1].c,buyQ:0,sellQ:0,extra:"+1.2% 24h"},
+    {name:"CoinDesk",ok:false,msg:"key required"}];
+  const f=S.mx.rows.slice(0,4), tb=f.reduce((a,r)=>a+r.buyQ,0), ts2=f.reduce((a,r)=>a+r.sellQ,0);
+  S.mx.buyPct=tb/(tb+ts2)*100; S.mx.t=Date.now();
+}
+
+function renderMX(){
+  const rows=S.mx.rows.map(r=>{
+    if(!r.ok) return `<div class="mx-row"><span class="mx-name">${r.name}</span>
+      <span class="sub">—</span><span class="mx-st">${esc(r.msg)}</span></div>`;
+    const hasFlow=(r.buyQ+r.sellQ)>0;
+    const bp=hasFlow? r.buyQ/(r.buyQ+r.sellQ)*100 : null;
+    const mid=hasFlow? `<div class="mx-bar"><i style="width:${bp}%;background:var(--green)"></i><i style="width:${100-bp}%;background:var(--red)"></i></div>`
+                     : `<span class="sub">${r.extra||"reference"}</span>`;
+    const st=hasFlow? `${bp.toFixed(0)}% buy` : fmt(r.price);
+    return `<div class="mx-row"><span class="mx-name">${r.name}</span>${mid}
+      <span class="mx-st live">${st}</span></div>`;
+  }).join("");
+  $("mxRows").innerHTML=rows;
+  const bp=S.mx.buyPct;
+  $("mxConsensus").innerHTML = bp==null? "" : `
+    <div style="margin-top:8px;font-size:12.5px">Consensus (volume-weighted):
+      <b style="color:${bp>=50?"var(--green)":"var(--red)"}">${bp>=50?"Buyers":"Sellers"} ${Math.max(bp,100-bp).toFixed(1)}% in control</b></div>
+    <div class="gauge"><i style="width:${bp}%;background:var(--green)"></i><i style="width:${100-bp}%;background:var(--red)"></i></div>`;
+  $("mxAge").textContent = S.demo? "· demo" : "· "+new Date(S.mx.t).toLocaleTimeString();
+}
+
+/* ---- long-term structure from daily candles ---- */
+async function loadLongTerm(){
+  S.longTerm=null;
+  try{
+    const kl = await getJSON(`${REST}/fapi/v1/klines?symbol=${S.symbol}&interval=1d&limit=250`, 10000);
+    const c=kl.map(k=>+k[4]);
+    const e50=emaArr(c,50), e200=emaArr(c,200);
+    const n=c.length-1, px=c[n];
+    const above200 = e200[n]!=null && px>e200[n];
+    const golden = e50[n]!=null && e200[n]!=null && e50[n]>e200[n];
+    const chg30 = c[n-30]!=null? (px/c[n-30]-1)*100 : null;
+    let score=(above200?1:-1)+(golden?1:-1)+(chg30!=null?(chg30>0?1:-1):0);
+    S.longTerm={
+      score,
+      label: score>=2?"Bullish structure":score<=-2?"Bearish structure":"Mixed / transition",
+      detail:`price ${above200?"above":"below"} 200-day EMA · ${golden?"golden":"death"} cross`+
+             (chg30!=null?` · 30d ${chg30>=0?"+":""}${chg30.toFixed(1)}%`:""),
+    };
+  }catch(e){
+    if (S.demo) S.longTerm={score:1,label:"Mixed / transition",detail:"demo data"};
+  }
+  renderForecast();
+}
+
+/* ---- forecast: weighted, order-flow-first (non-lagging inputs dominate) ---- */
+function computeForecast(){
+  const b=S.bars, n=b.length; if(n<30) return null;
+  const sg=signals(); if(!sg) return null;
+  const px=b[n-1].c;
+  const F=[]; // {label, val}  val in roughly [-1,1]
+  if (S.mx.buyPct!=null){
+    const v=(S.mx.buyPct-50)/50;
+    F.push({label:`Live taker flow across exchanges ${S.mx.buyPct.toFixed(0)}% buy`, val:Math.max(-1,Math.min(1,v*2.2))});
+  }
+  { // recent candle delta (last 3, volume-normalized)
+    let d=0,v=0; for(let i=n-3;i<n;i++){ d+=S.delta[i]; v+=b[i].v; }
+    const val=v? Math.max(-1,Math.min(1,(d/v)*3)) : 0;
+    F.push({label:"Recent candle delta "+(d>=0?"positive":"negative"), val:val*1.2});
+  }
+  { // CVD slope over last 10 bars
+    const a=S.cvd[n-11]??S.cvd[0], c2=S.cvd[n-1];
+    let vAbs=0; for(let i=Math.max(0,n-11);i<n;i++) vAbs+=Math.abs(S.delta[i]);
+    const val=vAbs? Math.max(-1,Math.min(1,(c2-a)/vAbs*2)) : 0;
+    F.push({label:"CVD "+(c2>=a?"rising":"falling")+" (10 bars)", val:val*1.5});
+  }
+  if (S.div) F.push({label:`CVD ${S.div.type==="bull"?"bullish":"bearish"} divergence`, val:S.div.type==="bull"?0.8:-0.8});
+  for(const z of S.zones){ // proximity to a fresh zone
+    const mid=(z.top+z.bot)/2, dist=Math.abs(px-mid)/px;
+    if (px>=z.bot*0.997 && px<=z.top*1.003){
+      F.push({label:`Price inside ${z.type} zone`, val:z.type==="demand"?0.6:-0.6}); break;
+    } else if (dist<0.004){
+      F.push({label:`Near ${z.type} zone (${fmt(z.bot)}–${fmt(z.top)})`, val:z.type==="demand"?0.35:-0.35}); break;
+    }
+  }
+  F.push({label:"Trend "+sg.trend, val:sg.ts*0.4});
+  if (sg.vwapSide!=null) F.push({label:"Price "+(sg.vwapSide?"above":"below")+" VWAP", val:sg.vwapSide?0.4:-0.4});
+  if (sg.oiRead==="Longs building") F.push({label:"OI: longs building", val:0.4});
+  if (sg.oiRead==="Shorts building") F.push({label:"OI: shorts building", val:-0.4});
+  if (sg.fund==="Crowded longs") F.push({label:"Funding: crowded longs (squeeze risk)", val:-0.3});
+  if (sg.fund==="Crowded shorts") F.push({label:"Funding: crowded shorts (squeeze fuel)", val:0.3});
+  const sum=F.reduce((a,f)=>a+f.val,0);
+  let up=50+50*Math.tanh(sum/2.4);
+  up=Math.max(12,Math.min(88,up));
+  return {up, F:F.sort((a,b2)=>Math.abs(b2.val)-Math.abs(a.val)).slice(0,4), sum};
+}
+
+function renderForecast(){
+  const fc=computeForecast(); const el=$("forecast");
+  if(!fc){ el.innerHTML=`<span class="sub">Waiting for data…</span>`; return; }
+  const up=fc.up, dnP=100-up;
+  const dir = up>=57? {t:"UP bias",c:"up"} : up<=43? {t:"DOWN bias",c:"dn"} : {t:"NO EDGE — wait",c:"wt"};
+  const why=fc.F.map(f=>`<li><span style="color:${f.val>=0?"var(--green)":"var(--red)"}">${f.val>=0?"▲":"▼"}</span> ${f.label}</li>`).join("");
+  const lt=S.longTerm;
+  el.innerHTML=`
+    <div class="fc-head">
+      <span class="fc-big" style="color:${up>=57?"var(--green)":up<=43?"var(--red)":"var(--amber)"}">${(up>=50?up:dnP).toFixed(0)}%</span>
+      <span class="fc-dir ${dir.c}">Next candles: ${dir.t}</span>
+    </div>
+    <div class="gauge"><i style="width:${up}%;background:var(--green)"></i><i style="width:${dnP}%;background:var(--red)"></i></div>
+    <div class="sub" style="display:flex;justify-content:space-between"><span>▲ up ${up.toFixed(0)}%</span><span>down ${dnP.toFixed(0)}% ▼</span></div>
+    <ul class="fc-why">${why}</ul>
+    <div class="fc-lt">Long-term (daily): ${lt? `<b style="color:${lt.score>=2?"var(--green)":lt.score<=-2?"var(--red)":"var(--amber)"}">${lt.label}</b> <span class="sub">${lt.detail}</span>` : `<span class="sub">unavailable</span>`}</div>`;
 }
 
 /* ============================ indicators ============================ */
@@ -847,10 +1079,12 @@ function stopLive(){
   if (S.ws){ try{S.ws.close();}catch(e){} S.ws=null; }
   if (S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer=null; }
   if (S.oiTimer){ clearInterval(S.oiTimer); S.oiTimer=null; }
+  if (S.mxTimer){ clearInterval(S.mxTimer); S.mxTimer=null; }
 }
 function liveDot(on,txt){ $("liveDot").innerHTML = `<span style="color:${on?"var(--green)":"var(--amber)"}">●</span> ${txt}`; }
 
 function startLive(){
+  S.mxTimer=setInterval(refreshMX, 20000);
   if (S.demo){ liveDot(false,"demo data"); S.pollTimer=setInterval(demoTick,1500); return; }
   const sym=S.symbol.toLowerCase();
   try{
@@ -873,20 +1107,26 @@ function startLive(){
   }
   S.oiTimer=setInterval(()=>{ loadOI(); loadLS(); },60000);
 }
+let klineRenderAt=0;
 function onKline(k){
   const b=S.bars, t=+k.t;
   const bar={t, o:+k.o, h:+k.h, l:+k.l, c:+k.c, v:+k.v, qv:+k.q, n:+k.n, tb:+k.V};
-  if (b.length && b[b.length-1].t===t) b[b.length-1]=bar;
+  const isNew = !(b.length && b[b.length-1].t===t);
+  if (!isNew) b[b.length-1]=bar;
   else { b.push(bar); if(b.length>BARS_LIMIT+100) b.shift(); S.view.right+=1; }
+  // Binance streams intra-candle updates ~4×/sec; throttle the full recompute+render
+  const now=Date.now();
+  if (!isNew && now-klineRenderAt<350) return;
+  klineRenderAt=now;
   computeAll();
-  renderStats(); renderChips(); renderZones(); drawAll();
+  renderStats(); renderChips(); renderZones(); drawAll(); renderForecast();
 }
 function demoTick(){
   const b=S.bars, last=b[b.length-1];
   const c=last.c*(1+(Math.random()-.5)*.0012);
   const dv=Math.random()*8+1, buy=Math.random()>.5?dv:0;
   b[b.length-1]={...last, c, h:Math.max(last.h,c), l:Math.min(last.l,c), v:last.v+dv, tb:last.tb+buy};
-  computeAll(); renderStats(); renderChips(); drawAll();
+  computeAll(); renderStats(); renderChips(); drawAll(); renderForecast();
 }
 
 /* ============================ calculator ============================ */
@@ -926,6 +1166,14 @@ function setupControls(){
   $("useLast").addEventListener("click",ev=>{
     ev.preventDefault();
     if (S.bars.length){ $("cEntry").value=S.bars[S.bars.length-1].c; calc(); }
+  });
+  $("cdKeyLink").addEventListener("click",ev=>{
+    ev.preventDefault();
+    const cur=localStorage.getItem("cd_key")||"";
+    const k=prompt("Paste your free CoinDesk data API key (developers.coindesk.com). Leave empty to remove.",cur);
+    if (k===null) return;
+    if (k.trim()) localStorage.setItem("cd_key",k.trim()); else localStorage.removeItem("cd_key");
+    refreshMX();
   });
 }
 
