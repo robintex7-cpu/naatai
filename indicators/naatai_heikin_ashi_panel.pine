@@ -1,0 +1,99 @@
+//@version=6
+// NaatAI Heikin Ashi Panel
+// ------------------------
+// Shows a Heikin Ashi chart in its OWN window (pane) below your main chart.
+//   * Timeframe selector — view any timeframe independently of the main chart
+//   * Built-in optional indicators: fast/slow EMA, Bollinger Bands
+//   * Trend-flip BUY/SELL markers + alerts
+//   * Mini dashboard: timeframe, trend, trend age, RSI
+//   * Hidden "HA Close" plot so you can apply ANY other TradingView indicator
+//     on this panel (set that indicator's Source to "NaatAI HA: HA Close")
+indicator("NaatAI Heikin Ashi Panel", "NaatAI HA", overlay = false, format = format.price)
+
+// ---------------------------------------------------------------- inputs ---
+haTf    = input.timeframe("", "Timeframe (blank = chart timeframe)",
+     tooltip = "The Heikin Ashi candles in this pane use this timeframe, independent of the main chart.")
+grpInd  = "Built-in indicators"
+showE1  = input.bool(true,  "EMA fast",        group = grpInd, inline = "e1")
+e1Len   = input.int(9,      "",                group = grpInd, inline = "e1", minval = 2)
+showE2  = input.bool(true,  "EMA slow",        group = grpInd, inline = "e2")
+e2Len   = input.int(21,     "",                group = grpInd, inline = "e2", minval = 2)
+showBB  = input.bool(false, "Bollinger Bands", group = grpInd, inline = "bb")
+bbLen   = input.int(20,     "",                group = grpInd, inline = "bb", minval = 2)
+bbMult  = input.float(2.0,  "mult",            group = grpInd, inline = "bb", step = 0.5)
+rsiLen  = input.int(14,     "RSI length (dashboard)", group = grpInd, minval = 2)
+showSig = input.bool(true,  "Trend-flip signals",     group = grpInd)
+grpUi   = "Dashboard"
+showTbl = input.bool(true,  "Show dashboard",  group = grpUi)
+tblPos  = input.string("Top right", "Position", group = grpUi,
+     options = ["Top right", "Top left", "Bottom right", "Bottom left"])
+
+// -------------------------------------------------------- heikin ashi data ---
+haTicker = ticker.heikinashi(syminfo.tickerid)
+[haO, haH, haL, haC] = request.security(haTicker, haTf, [open, high, low, close],
+     gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
+
+haUp   = haC >= haO
+colUp  = color.rgb(8, 153, 129)
+colDn  = color.rgb(242, 54, 69)
+
+// ------------------------------------------------------ built-in overlays ---
+ema1   = ta.ema(haC, e1Len)
+ema2   = ta.ema(haC, e2Len)
+bbBase = ta.sma(haC, bbLen)
+bbDev  = bbMult * ta.stdev(haC, bbLen)
+rsiHa  = ta.rsi(haC, rsiLen)
+
+// ------------------------------------------------------------------ plots ---
+plotcandle(haO, haH, haL, haC, title = "Heikin Ashi",
+     color = haUp ? colUp : colDn,
+     wickcolor = haUp ? colUp : colDn,
+     bordercolor = haUp ? colUp : colDn)
+
+plot(showE1 ? ema1 : na, "EMA fast", color = color.new(color.rgb(66, 135, 245), 0), linewidth = 1)
+plot(showE2 ? ema2 : na, "EMA slow", color = color.new(color.orange, 0),            linewidth = 1)
+pU = plot(showBB ? bbBase + bbDev : na, "BB upper", color = color.new(color.gray, 50))
+pL = plot(showBB ? bbBase - bbDev : na, "BB lower", color = color.new(color.gray, 50))
+fill(pU, pL, color = color.new(color.gray, 92), title = "BB fill")
+plot(showBB ? bbBase : na, "BB basis", color = color.new(color.gray, 40), style = plot.style_line)
+
+// Hidden source plot: lets you apply any other indicator on this pane.
+// In the other indicator's settings choose Source = "NaatAI HA: HA Close".
+plot(haC, "HA Close", display = display.none, editable = false)
+
+// -------------------------------------------------------------- signals ---
+flipUp = haUp and not haUp[1]
+flipDn = not haUp and haUp[1]
+plotshape(showSig and flipUp, title = "HA flip up",   style = shape.triangleup,
+     location = location.bottom, color = colUp, size = size.tiny, text = "BUY")
+plotshape(showSig and flipDn, title = "HA flip down", style = shape.triangledown,
+     location = location.top, color = colDn, size = size.tiny, text = "SELL")
+
+// how many bars the current trend has lasted
+var int trendAge = 0
+trendAge := flipUp or flipDn ? 1 : trendAge + 1
+
+// -------------------------------------------------------------- dashboard ---
+pos = tblPos == "Top right" ? position.top_right :
+     tblPos == "Top left" ? position.top_left :
+     tblPos == "Bottom right" ? position.bottom_right : position.bottom_left
+var table dash = table.new(pos, 2, 4, bgcolor = color.new(chart.bg_color, 15),
+     border_color = color.new(color.gray, 60), border_width = 1)
+if showTbl and barstate.islast
+    fg  = chart.fg_color
+    hdr = color.new(color.rgb(66, 135, 245), 0)
+    tfTxt = haTf == "" ? timeframe.period : haTf
+    table.cell(dash, 0, 0, "Heikin Ashi", text_color = hdr, text_size = size.small)
+    table.cell(dash, 1, 0, tfTxt,         text_color = hdr, text_size = size.small)
+    table.cell(dash, 0, 1, "Trend",       text_color = fg,  text_size = size.small)
+    table.cell(dash, 1, 1, haUp ? "UP" : "DOWN",
+         text_color = haUp ? colUp : colDn, text_size = size.small)
+    table.cell(dash, 0, 2, "Trend age",   text_color = fg,  text_size = size.small)
+    table.cell(dash, 1, 2, str.tostring(trendAge) + " bars", text_color = fg, text_size = size.small)
+    table.cell(dash, 0, 3, "RSI(" + str.tostring(rsiLen) + ")", text_color = fg, text_size = size.small)
+    table.cell(dash, 1, 3, str.tostring(rsiHa, "#.#"),
+         text_color = rsiHa > 70 ? colDn : rsiHa < 30 ? colUp : fg, text_size = size.small)
+
+// ------------------------------------------------------------------ alerts ---
+alertcondition(flipUp, "NaatAI HA flip UP",   "Heikin Ashi trend flipped UP")
+alertcondition(flipDn, "NaatAI HA flip DOWN", "Heikin Ashi trend flipped DOWN")

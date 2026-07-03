@@ -18,12 +18,14 @@ ltfIn    = input.timeframe("", "Lower timeframe (blank = auto)", group = grpVol,
      tooltip = "Intrabar timeframe used to split volume into buy/sell. Leave blank to pick automatically from the chart timeframe.")
 grpCndl  = "Candles & footprint"
 showFp   = input.bool(true,  "Show footprint cells",        group = grpCndl)
-fpBars   = input.int(24,     "Footprint: last N bars",      group = grpCndl, minval = 2,  maxval = 60)
-fpRows   = input.int(4,      "Footprint: rows per candle",  group = grpCndl, minval = 2,  maxval = 8)
+fpBars   = input.int(14,     "Footprint: last N bars",      group = grpCndl, minval = 2,  maxval = 60)
+fpRows   = input.int(3,      "Footprint: rows per candle",  group = grpCndl, minval = 2,  maxval = 8)
+fpFill   = input.bool(false, "Fill footprint cells",        group = grpCndl,
+     tooltip = "Off = clean text-only numbers like a classic footprint chart. On = shaded green/red cell backgrounds.")
 imbRatio = input.float(3.0,  "Imbalance ratio (x)",         group = grpCndl, minval = 1.5, step = 0.5,
      tooltip = "A footprint cell is highlighted orange when one side's volume is at least this many times the other side's.")
 showLbl  = input.bool(true,  "Show volume/delta labels",    group = grpCndl)
-lblBars  = input.int(30,     "Labels: last N bars",         group = grpCndl, minval = 2, maxval = 120)
+lblBars  = input.int(20,     "Labels: last N bars",         group = grpCndl, minval = 2, maxval = 120)
 grpSig   = "Signals & probability"
 rsiLen   = input.int(14,     "RSI length",                  group = grpSig, minval = 2)
 emaFLen  = input.int(21,     "Fast EMA",                    group = grpSig, minval = 2)
@@ -197,12 +199,14 @@ if showFp and barstate.isconfirmed and haveLtf
                 yT = low + rng * (r2 + 1) / fpRows
                 buyImb  = s > 0 ? b / s >= imbRatio : b > 0
                 sellImb = b > 0 ? s / b >= imbRatio : s > 0
-                bCol = buyImb ? color.new(color.orange, 0) : sellImb ? color.new(color.orange, 0) : color.new(color.gray, 60)
-                fCol = b >= s ? color.new(colBuy, 78) : color.new(colSell, 78)
+                imb     = buyImb or sellImb
+                bCol = imb ? color.new(color.orange, 0) : color.new(color.gray, 100)
+                fCol = fpFill ? (b >= s ? color.new(colBuy, 88) : color.new(colSell, 88)) : color.new(color.gray, 100)
+                tCol = b >= s ? color.new(colBuy, 0) : color.new(colSell, 0)
                 array.push(fpBoxes, box.new(bar_index, yT, bar_index, yB,
-                     border_color = bCol, border_width = buyImb or sellImb ? 2 : 1,
+                     border_color = bCol, border_width = 1,
                      bgcolor = fCol, text = fmtVol(s) + " x " + fmtVol(b),
-                     text_size = size.tiny, text_color = color.new(chart.fg_color, 15)))
+                     text_size = size.tiny, text_color = tCol))
     while array.size(fpBoxes) > fpBars * fpRows
         box.delete(array.shift(fpBoxes))
 
