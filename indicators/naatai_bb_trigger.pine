@@ -1,0 +1,67 @@
+//@version=6
+// NaatAI BB Trigger (Ergodic CCI)
+// -------------------------------
+// Recreation of the MT4 "BB_Trigger" indicator from the Binary Breaker
+// template: William Blau's Ergodic oscillator with a trigger line.
+// Defaults match the template: pq=2, pr=10, ps=5, trigger=3.
+//   * Yellow ergodic line vs red trigger line (original colors)
+//   * LONG / SHORT / NEUTRAL state, histogram, background shading
+//   * Cross signals + alerts
+// Add this as a SEPARATE indicator — it opens in its own window below the
+// chart, exactly like the MT4 template's second window.
+indicator("NaatAI BB Trigger (Ergodic)", "NaatAI BBT", overlay = false, precision = 1)
+
+// ---------------------------------------------------------------- inputs ---
+pq      = input.int(2,  "Momentum period (pq)",   minval = 1)
+pr      = input.int(10, "First smoothing (pr)",   minval = 1)
+ps      = input.int(5,  "Second smoothing (ps)",  minval = 1)
+trigLen = input.int(3,  "Trigger line (trigger)", minval = 1)
+neutral = input.float(10, "Neutral zone +/-", minval = 0, step = 5,
+     tooltip = "Ergodic between -zone and +zone is treated as NEUTRAL (no trade).")
+shade   = input.bool(true, "Background shading")
+showHist= input.bool(true, "Show histogram")
+
+// ------------------------------------------------------------ calculation ---
+mtm    = close - close[pq]
+num    = ta.ema(ta.ema(mtm, pr), ps)
+den    = ta.ema(ta.ema(math.abs(mtm), pr), ps)
+ergo   = den != 0 ? 100 * num / den : 0.0
+trig   = ta.ema(ergo, trigLen)
+
+longSt    = ergo > trig and ergo > neutral
+shortSt   = ergo < trig and ergo < -neutral
+crossUp   = ta.crossover(ergo, trig)  and barstate.isconfirmed
+crossDown = ta.crossunder(ergo, trig) and barstate.isconfirmed
+
+colLong  = color.rgb(8, 153, 129)
+colShort = color.rgb(242, 54, 69)
+
+// ------------------------------------------------------------------ plots ---
+bgcolor(shade ? (longSt ? color.new(colLong, 90) : shortSt ? color.new(colShort, 90) : na) : na,
+     title = "State shading")
+hline(0,        "Zero",          color = color.new(color.gray, 40))
+hline(50,       "Overbought",    color = color.new(color.gray, 70), linestyle = hline.style_dotted)
+hline(-50,      "Oversold",      color = color.new(color.gray, 70), linestyle = hline.style_dotted)
+plot(showHist ? ergo - trig : na, "Histogram", style = plot.style_columns,
+     color = ergo - trig >= 0 ? color.new(colLong, 70) : color.new(colShort, 70))
+plot(ergo, "Ergodic", color = color.rgb(255, 235, 59), linewidth = 2)
+plot(trig, "Trigger", color = color.rgb(242, 54, 69),  linewidth = 1)
+
+plotshape(crossUp,   "Cross up",   style = shape.triangleup,   location = location.bottom,
+     color = colLong,  size = size.tiny)
+plotshape(crossDown, "Cross down", style = shape.triangledown, location = location.top,
+     color = colShort, size = size.tiny)
+
+// ------------------------------------------------------------- state label ---
+var table st = table.new(position.top_right, 1, 1)
+if barstate.islast
+    stTxt = longSt ? "LONG" : shortSt ? "SHORT" : "NEUTRAL"
+    stCol = longSt ? colLong : shortSt ? colShort : color.gray
+    table.cell(st, 0, 0, stTxt, text_color = color.white, text_size = size.small,
+         bgcolor = color.new(stCol, 20))
+
+// ------------------------------------------------------------------ alerts ---
+alertcondition(crossUp,   "BBT cross UP",   "BB Trigger: ergodic crossed ABOVE trigger line")
+alertcondition(crossDown, "BBT cross DOWN", "BB Trigger: ergodic crossed BELOW trigger line")
+alertcondition(crossUp and ergo < -neutral,  "BBT reversal LONG",  "BB Trigger: bullish cross from oversold")
+alertcondition(crossDown and ergo > neutral, "BBT reversal SHORT", "BB Trigger: bearish cross from overbought")
