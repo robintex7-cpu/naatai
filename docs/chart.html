@@ -96,6 +96,25 @@
   .calc .out { margin-top:10px; border-top:1px dashed var(--line); padding-top:8px; }
   .calc .kv { display:flex; justify-content:space-between; padding:3px 0; font-size:12.5px; font-variant-numeric:tabular-nums; }
   .calc .kv span:first-child { color:var(--muted); }
+  .dash { position:absolute; top:22px; right:72px; z-index:3; background:rgba(19,24,35,.93);
+    border:1px solid var(--line); border-radius:10px; font-size:11.5px; min-width:178px;
+    padding:4px 0 5px; pointer-events:none; }
+  .dash .dr { display:flex; justify-content:space-between; gap:14px; padding:2.5px 10px;
+    font-variant-numeric:tabular-nums; }
+  .dash .dr.hd { border-bottom:1px solid var(--line); margin-bottom:3px; color:var(--blue); font-weight:700; }
+  .dash .k { color:var(--muted); } .dash .v { font-weight:600; }
+  @media (max-width:760px){ .dash { display:none; } }
+  .ha-head { display:flex; justify-content:space-between; align-items:center;
+    padding:9px 8px 3px; font-size:12px; color:var(--muted); border-top:1px solid var(--line); margin-top:5px; }
+  .ha-info { display:flex; gap:14px; font-variant-numeric:tabular-nums; }
+  .guide h2 { font-size:17px; margin:22px 0 10px; }
+  .gcards { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+  .gcard { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:13px 15px; font-size:12.5px; color:var(--muted); line-height:1.55; }
+  .gcard .gn { display:inline-flex; width:22px; height:22px; border-radius:50%; background:var(--blue);
+    color:#fff; align-items:center; justify-content:center; font-weight:800; font-size:12px; margin-right:8px; }
+  .gcard b { color:var(--text); }
+  .gcard .gt { color:var(--text); font-weight:700; font-size:13.5px; }
   .howto { font-size:12px; color:var(--muted); line-height:1.55; }
   .howto b { color:var(--text); }
   .howto li { margin-bottom:6px; }
@@ -130,11 +149,16 @@
 
   <div class="main">
     <div class="chartcol" id="chartcol">
-      <div class="pane" id="pPrice"><div class="plabel">Price</div><div class="legend" id="legPrice"></div><canvas></canvas></div>
+      <div class="pane" id="pPrice"><div class="plabel">Price</div><div class="legend" id="legPrice"></div><div class="dash" id="dash"></div><canvas></canvas></div>
       <div class="pane" id="pDelta"><div class="plabel">Delta</div><div class="legend" id="legDelta"></div><canvas></canvas></div>
       <div class="pane" id="pCvd"><div class="plabel">CVD</div><div class="legend" id="legCvd"></div><canvas></canvas></div>
       <div class="pane" id="pOi"><div class="plabel">OI</div><div class="legend" id="legOi"></div><canvas></canvas></div>
       <div class="pane" id="pAxis"><canvas></canvas></div>
+      <div class="ha-head">
+        <span>NaatAI Heikin Ashi Panel · 1h</span>
+        <span class="ha-info" id="haInfo"></span>
+      </div>
+      <div class="pane" id="pHa"><canvas></canvas></div>
     </div>
 
     <div class="side">
@@ -186,9 +210,40 @@
     </div>
   </div>
 
+  <div class="guide">
+    <h2>How to take a trade — step by step</h2>
+    <div class="gcards">
+      <div class="gcard"><span class="gn">1</span><span class="gt">Wait for the candle to CLOSE</span><br/>
+        The <b style="color:var(--green)">BUY</b> triangle only prints when the signal candle closes.
+        Never enter mid-candle — the numbers are still changing until the close.</div>
+      <div class="gcard"><span class="gn">2</span><span class="gt">Check delta ≥ +15%</span><br/>
+        Dashboard "Delta" row must be strongly <b style="color:var(--green)">green</b> (buyers dominant).
+        For a SELL you want ≤ −15%. The delta pane below the chart shows it per candle.</div>
+      <div class="gcard"><span class="gn">3</span><span class="gt">HTF trend must agree</span><br/>
+        "HTF trend (4h)" row says <b style="color:var(--green)">UP</b> → longs only. Says
+        <b style="color:var(--red)">DOWN</b> → shorts only. Trading with the 4-hour trend filters out most losing signals.</div>
+      <div class="gcard"><span class="gn">4</span><span class="gt">Fib / zone confluence</span><br/>
+        Best entries happen where price bounces off the <b>0.5–0.618 fib zone</b> or a demand/supply zone.
+        Price holding the level + positive delta = buyers defending support.</div>
+      <div class="gcard"><span class="gn">5</span><span class="gt">Enter with the printed SL/TP</span><br/>
+        Enter at the signal candle's close. Stop-loss and take-profit are printed on the chart
+        (SL = 1.5×ATR, TP = 2R). <b>Risk 1% of account</b> — use the position size calculator.</div>
+      <div class="gcard"><span class="gn">6</span><span class="gt">Heikin Ashi confirms &amp; manages</span><br/>
+        Bottom panel flipped <b style="color:var(--green)">green</b> = higher-timeframe momentum agrees.
+        Hold to TP/SL; exit early only if the HA panel flips <b style="color:var(--red)">red</b> against you.</div>
+    </div>
+    <div class="gcard" style="margin-top:12px">
+      <span class="gt">Managing the trade</span><br/>
+      — <b>+1R in profit</b> (price moved the same distance as your stop) → move stop-loss to break-even. The trade can no longer lose.<br/>
+      — <b>Exit</b> at TP or SL (mechanical, preferred), on an opposite signal, or if the Heikin Ashi panel flips against you.<br/>
+      — <b>Typical hold on the 15m chart:</b> 1–6 hours. On 1h: 4h–2 days. On 4h: 1–7 days.<br/>
+      — <b>Skip the trade</b> if any of steps 1–4 or 6 is missing, or within 15 min of major news (CPI, FOMC, NFP).
+    </div>
+  </div>
+
   <footer>
     Data: Binance Futures public API (fapi.binance.com) — fetched live by your browser, nothing is stored.<br/>
-    Educational tool, NOT financial advice. Futures/perpetuals use leverage — you can lose more than your margin.
+    Educational tool, NOT financial advice. Every strategy takes losing trades; the 1% risk rule is what keeps them survivable.
   </footer>
 </div>
 
@@ -214,6 +269,7 @@ const S = {
   zones:[], profile:null, div:null, mark:null, tick24:null, lsRatio:null,
   demo:false, ws:null, pollTimer:null, oiTimer:null, mxTimer:null,
   mx:{rows:[], buyPct:null, t:0}, longTerm:null, geckoIds:{},
+  rsi:[], atr:[], fib:null, signals:[], htfUp:null, ha:[], haRsi:null,
   view:{ barW:9, right:0 }, cross:null, pxDec:2,
 };
 
@@ -281,8 +337,8 @@ async function loadAll(){
   S.pxDec = priceDecimals(S.bars[S.bars.length-1].c);
   computeAll();
   resetView();
-  renderStats(); renderChips(); renderZones(); drawAll(); calc();
-  loadLongTerm(); refreshMX();
+  renderStats(); renderChips(); renderZones(); drawAll(); calc(); renderDash();
+  loadLongTerm(); refreshMX(); loadHTF(); loadHA();
   startLive();
 }
 
@@ -519,6 +575,26 @@ function renderForecast(){
 }
 
 /* ============================ indicators ============================ */
+function rsiArr(src, len){
+  const out=new Array(src.length).fill(null);
+  let g=0,l=0;
+  for(let i=1;i<src.length;i++){
+    const ch=src[i]-src[i-1], up=Math.max(ch,0), dn=Math.max(-ch,0);
+    if (i<=len){ g+=up; l+=dn; if(i===len){ g/=len; l/=len; out[i]= l===0?100:100-100/(1+g/l); } }
+    else { g=(g*(len-1)+up)/len; l=(l*(len-1)+dn)/len; out[i]= l===0?100:100-100/(1+g/l); }
+  }
+  return out;
+}
+function atrArr(b, len){
+  const out=new Array(b.length).fill(null);
+  let a=null;
+  for(let i=1;i<b.length;i++){
+    const tr=Math.max(b[i].h-b[i].l, Math.abs(b[i].h-b[i-1].c), Math.abs(b[i].l-b[i-1].c));
+    a = a===null? tr : (a*(len-1)+tr)/len;
+    if (i>=len) out[i]=a;
+  }
+  return out;
+}
 function emaArr(src, len){
   const out=new Array(src.length).fill(null); const k=2/(len+1); let e=null;
   for(let i=0;i<src.length;i++){
@@ -543,10 +619,98 @@ function computeAll(){
     pv+=tp*b[i].v; vv+=b[i].v;
     S.vwap[i]= vv? pv/vv : null;
   }
+  S.rsi=rsiArr(closes,14); S.atr=atrArr(b,14);
   mapOI();
   detectZones();
   buildProfile();
   S.div = detectDivergence();
+  computeFib();
+  detectSignals();
+}
+
+/* ---- auto fib retracement of the last swing (0.382 / 0.5 / 0.618) ---- */
+function computeFib(){
+  const b=S.bars, n=b.length;
+  if (n<30){ S.fib=null; return; }
+  const look=Math.min(100,n), start=n-look;
+  let hh=-Infinity,ll=Infinity,hi=start,li=start;
+  for(let i=start;i<n;i++){
+    if(b[i].h>hh){hh=b[i].h;hi=i;}
+    if(b[i].l<ll){ll=b[i].l;li=i;}
+  }
+  const up=hi>li, f=r=> up? hh-(hh-ll)*r : ll+(hh-ll)*r;
+  S.fib={f382:f(0.382), f500:f(0.5), f618:f(0.618), start};
+}
+
+/* ---- BUY/SELL signal engine (same rules as the Pine script) ---- */
+const SIG={thr:15, space:5, atrMult:1.5, rr:2};
+function detectSignals(){
+  const b=S.bars, n=b.length, out=[];
+  let lastI=-99;
+  const htfUp=S.htfUp; // null = unknown → don't block
+  for(let i=50;i<n-1;i++){        // closed candles only
+    if (i-lastI<SIG.space) continue;
+    const v=b[i].v; if(!v||S.rsi[i]==null||S.atr[i]==null) continue;
+    const dp=S.delta[i]/v*100;
+    let type=null;
+    if (dp>=SIG.thr  && htfUp!==false && S.rsi[i]<70) type="buy";
+    else if (dp<=-SIG.thr && htfUp!==true && S.rsi[i]>30) type="sell";
+    if(!type) continue;
+    const entry=b[i].c, d=S.atr[i]*SIG.atrMult;
+    const sl=type==="buy"? entry-d : entry+d;
+    const tp=type==="buy"? entry+d*SIG.rr : entry-d*SIG.rr;
+    out.push({i,type,entry,sl,tp,dp});
+    lastI=i;
+  }
+  S.signals=out;
+}
+
+/* ---- higher-timeframe (4h) trend filter ---- */
+async function loadHTF(){
+  if (S.demo){
+    const n=S.bars.length;
+    S.htfUp = S.ema50[n-1]!=null && S.ema200[n-1]!=null ? S.ema50[n-1]>S.ema200[n-1] : null;
+    computeAll(); drawAll(); renderDash(); return;
+  }
+  try{
+    const kl=await getJSON(`${REST}/fapi/v1/klines?symbol=${S.symbol}&interval=4h&limit=120`,10000);
+    const c=kl.map(k=>+k[4]), e20=emaArr(c,20), e50=emaArr(c,50), m=c.length-1;
+    S.htfUp = e20[m]!=null && e50[m]!=null ? e20[m]>e50[m] : null;
+  }catch(e){ S.htfUp=null; }
+  computeAll(); drawAll(); renderDash();
+}
+
+/* ---- Heikin Ashi panel data (1h) ---- */
+function computeHAFromRaw(raw){
+  const out=[]; let po=null,pc=null;
+  for(const k of raw){
+    const c4=(k.o+k.h+k.l+k.c)/4;
+    const o4= po==null? (k.o+k.c)/2 : (po+pc)/2;
+    out.push({t:k.t, o:o4, h:Math.max(k.h,o4,c4), l:Math.min(k.l,o4,c4), c:c4});
+    po=o4; pc=c4;
+  }
+  return out;
+}
+async function loadHA(){
+  if (S.demo){
+    // aggregate demo bars into pseudo-1h candles
+    const per=Math.max(1,Math.round(36e5/(S.bars[1].t-S.bars[0].t)));
+    const raw=[];
+    for(let i=0;i<S.bars.length;i+=per){
+      const gr=S.bars.slice(i,i+per);
+      raw.push({t:gr[0].t,o:gr[0].o,h:Math.max(...gr.map(x=>x.h)),l:Math.min(...gr.map(x=>x.l)),c:gr[gr.length-1].c});
+    }
+    S.ha=computeHAFromRaw(raw);
+    S.haRsi=rsiArr(raw.map(x=>x.c),14).pop();
+    drawHA(); return;
+  }
+  try{
+    const kl=await getJSON(`${REST}/fapi/v1/klines?symbol=${S.symbol}&interval=1h&limit=200`,10000);
+    const raw=kl.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
+    S.ha=computeHAFromRaw(raw);
+    S.haRsi=rsiArr(raw.map(x=>x.c),14).pop();
+  }catch(e){ S.ha=[]; S.haRsi=null; }
+  drawHA();
 }
 function mapOI(){
   const b=S.bars, out=new Array(b.length).fill(null);
@@ -740,7 +904,7 @@ function renderZones(){
 /* ============================ chart engine ============================ */
 const AXIS_W=64, panes={};
 function setupPanes(){
-  const defs=[["pPrice",380],["pDelta",84],["pCvd",108],["pOi",84],["pAxis",24]];
+  const defs=[["pPrice",380],["pDelta",84],["pCvd",108],["pOi",84],["pAxis",24],["pHa",132]];
   for(const [id,h] of defs){
     const el=$(id), cv=el.querySelector("canvas");
     panes[id]={el,cv,ctx:cv.getContext("2d"),h,w:0};
@@ -806,7 +970,7 @@ function yAxisTicks(ctx,w,h,sc,dec){
 
 function drawAll(){
   if(!S.bars.length) return;
-  drawPrice(); drawDelta(); drawCVD(); drawOI(); drawTimeAxis();
+  drawPrice(); drawDelta(); drawCVD(); drawOI(); drawTimeAxis(); drawHA();
   drawLegends();
 }
 
@@ -850,6 +1014,19 @@ function drawPrice(){
     ctx.fillText((sup?"SUPPLY":"DEMAND")+" ×"+z.strength.toFixed(1), x0+4, sup? y1-4 : y0+10);
   }
 
+  /* fib retracement levels */
+  if (S.fib){
+    const fibs=[["0.382",S.fib.f382,"#4d9fff"],["0.5",S.fib.f500,COL.poc],["0.618",S.fib.f618,COL.up]];
+    ctx.font="9.5px sans-serif";
+    for(const [lab,v,col] of fibs){
+      const y=sc.y(v); if(y<8||y>h-4) continue;
+      ctx.strokeStyle=col; ctx.globalAlpha=0.55; ctx.setLineDash([2,4]);
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w-AXIS_W,y); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.fillStyle=col; ctx.fillText(lab+" "+fmt(v), 6, y-3);
+    }
+  }
+
   /* candles */
   const bw=Math.max(1,S.view.barW*0.72);
   for(let i=i0;i<=i1;i++){
@@ -858,6 +1035,22 @@ function drawPrice(){
     ctx.beginPath(); ctx.moveTo(x,sc.y(k.h)); ctx.lineTo(x,sc.y(k.l)); ctx.stroke();
     const yO=sc.y(k.o), yC=sc.y(k.c);
     ctx.fillRect(x-bw/2, Math.min(yO,yC), bw, Math.max(1,Math.abs(yC-yO)));
+  }
+
+  /* per-candle volume + delta% labels (when zoomed in) */
+  if (S.view.barW>=9){
+    const step=Math.max(1,Math.round(46/S.view.barW));
+    ctx.font="9px sans-serif"; ctx.textAlign="center";
+    for(let i=i1;i>=i0;i-=step){
+      const x=xOf(i), k=b[i];
+      if (x<24||x>w-AXIS_W-24) continue;
+      ctx.fillStyle=COL.axisTx;
+      ctx.fillText("V:"+fmtSig(k.v), x, sc.y(k.h)-14);
+      const dp=k.v? S.delta[i]/k.v*100 : 0;
+      ctx.fillStyle=dp>=0?COL.up:COL.dn;
+      ctx.fillText((dp>=0?"+":"")+dp.toFixed(0)+"%", x, sc.y(k.l)+17);
+    }
+    ctx.textAlign="left";
   }
 
   /* EMA / VWAP overlays */
@@ -882,6 +1075,56 @@ function drawPrice(){
     ctx.beginPath(); ctx.moveTo(xOf(d.a),ya); ctx.lineTo(xOf(d.c),yc); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle=bear?COL.dn:COL.up; ctx.font="12px sans-serif";
     ctx.fillText(bear?"▼ div":"▲ div", xOf(d.c)+5, yc+(bear?-6:12));
+  }
+
+  /* BUY / SELL signal markers */
+  const tri=(x,y,up,col)=>{
+    ctx.fillStyle=col; ctx.beginPath();
+    if(up){ ctx.moveTo(x,y); ctx.lineTo(x-5,y+8); ctx.lineTo(x+5,y+8); }
+    else  { ctx.moveTo(x,y); ctx.lineTo(x-5,y-8); ctx.lineTo(x+5,y-8); }
+    ctx.closePath(); ctx.fill();
+  };
+  ctx.font="bold 9.5px sans-serif";
+  for(const s of S.signals.slice(-10)){
+    if(s.i<i0||s.i>i1) continue;
+    const x=xOf(s.i);
+    ctx.textAlign="center";
+    if(s.type==="buy"){
+      tri(x,sc.y(b[s.i].l)+13,true,COL.up);
+      ctx.fillStyle=COL.up; ctx.fillText("BUY",x,sc.y(b[s.i].l)+32);
+    }else{
+      tri(x,sc.y(b[s.i].h)-13,false,COL.dn);
+      ctx.fillStyle=COL.dn; ctx.fillText("SELL",x,sc.y(b[s.i].h)-25);
+    }
+    ctx.textAlign="left";
+  }
+
+  /* latest signal: ENTRY / SL / TP with shaded reward & risk areas */
+  const sLast=S.signals[S.signals.length-1];
+  if (sLast && sLast.i<=i1 && xOf(sLast.i)<w-AXIS_W){
+    const x0s=Math.max(0,xOf(sLast.i)), xr=w-AXIS_W;
+    const yE=sc.y(sLast.entry), yS=sc.y(sLast.sl), yT=sc.y(sLast.tp);
+    ctx.fillStyle=COL.upA+"0.07)";
+    ctx.fillRect(x0s,Math.min(yE,yT),xr-x0s,Math.abs(yT-yE));
+    ctx.fillStyle=COL.dnA+"0.07)";
+    ctx.fillRect(x0s,Math.min(yE,yS),xr-x0s,Math.abs(yS-yE));
+    const dash=(y,col)=>{ ctx.strokeStyle=col; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(x0s,y); ctx.lineTo(xr,y); ctx.stroke(); ctx.setLineDash([]); };
+    dash(yE,"rgba(230,237,243,.8)"); dash(yS,COL.dn); dash(yT,COL.up);
+    ctx.font="bold 10px sans-serif";
+    ctx.fillStyle="#e6edf3"; ctx.fillText("ENTRY "+fmt(sLast.entry), xr-158, yE-4);
+    ctx.fillStyle=COL.dn;    ctx.fillText("SL "+fmt(sLast.sl)+" (−1R)", xr-158, yS-4);
+    ctx.fillStyle=COL.up;    ctx.fillText("TP "+fmt(sLast.tp)+" (+"+SIG.rr+"R)", xr-158, yT-4);
+    axisLabel(ctx,w,yS,fmt(sLast.sl),"#fff","#7e2f2f");
+    axisLabel(ctx,w,yT,fmt(sLast.tp),"#fff","#1d6b3f");
+    /* orange highlight + buy×sell footprint of the signal candle */
+    const kk=b[sLast.i], bwS=Math.max(3,S.view.barW*0.95);
+    ctx.strokeStyle="#f5a623";
+    ctx.strokeRect(xOf(sLast.i)-bwS/2, sc.y(kk.h)-2, bwS, sc.y(kk.l)-sc.y(kk.h)+4);
+    if (S.view.barW>=7){
+      ctx.fillStyle="#f5a623"; ctx.font="9px sans-serif";
+      ctx.fillText(fmtSig(kk.tb)+"×"+fmtSig(Math.max(0,kk.v-kk.tb)), xOf(sLast.i)+bwS, sc.y((kk.h+kk.l)/2));
+    }
   }
 
   /* last price line */
@@ -976,6 +1219,74 @@ function drawTimeAxis(){
       ctx.fillStyle="#fff"; ctx.fillText(txt,x-30,13);
     }
   }
+}
+
+function drawHA(){
+  const p=panes.pHa; if(!p) return;
+  const ctx=p.ctx, w=p.w, h=p.hCur;
+  ctx.clearRect(0,0,w,h);
+  const ha=S.ha;
+  if(!ha.length){
+    ctx.fillStyle=COL.axisTx; ctx.font="11px sans-serif";
+    ctx.fillText("Heikin Ashi data loading…",10,h/2);
+    $("haInfo").textContent=""; return;
+  }
+  const N=Math.min(70,ha.length), arr=ha.slice(-N);
+  let lo=Infinity,hi=-Infinity;
+  for(const x of arr){ if(x.l<lo)lo=x.l; if(x.h>hi)hi=x.h; }
+  const sc=yScaler(lo,hi,h,0.14), bw=(w-AXIS_W)/(N+2);
+  let flipX=null, flipUp=null;
+  for(let k=0;k<N;k++){
+    const x=arr[k], cx=(k+1)*bw+bw/2, up=x.c>=x.o, col=up?COL.up:COL.dn;
+    ctx.strokeStyle=col; ctx.fillStyle=col;
+    ctx.beginPath(); ctx.moveTo(cx,sc.y(x.h)); ctx.lineTo(cx,sc.y(x.l)); ctx.stroke();
+    ctx.fillRect(cx-bw*0.32, Math.min(sc.y(x.o),sc.y(x.c)), Math.max(1,bw*0.64),
+      Math.max(1,Math.abs(sc.y(x.c)-sc.y(x.o))));
+    if(k>0 && up!==(arr[k-1].c>=arr[k-1].o)){
+      flipX=cx; flipUp=up;
+      const y=up? sc.y(x.l)+11 : sc.y(x.h)-11;
+      ctx.beginPath();
+      if(up){ ctx.moveTo(cx,y-5); ctx.lineTo(cx-4,y+3); ctx.lineTo(cx+4,y+3); }
+      else  { ctx.moveTo(cx,y+5); ctx.lineTo(cx-4,y-3); ctx.lineTo(cx+4,y-3); }
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  const lastUp=arr[N-1].c>=arr[N-1].o;
+  if (flipX!=null && flipUp===lastUp){
+    ctx.fillStyle=lastUp?COL.up:COL.dn; ctx.font="10px sans-serif";
+    ctx.fillText(lastUp?"▲ HA flip → uptrend confirmed":"▼ HA flip → downtrend confirmed",
+      Math.min(flipX+8, w-AXIS_W-185), h-7);
+  }
+  ctx.fillStyle=COL.axisTx; ctx.font="10.5px sans-serif";
+  ctx.fillText(fmt(hi), w-AXIS_W+5, 12);
+  ctx.fillText(fmt(lo), w-AXIS_W+5, h-5);
+  $("haInfo").innerHTML =
+    `<span>Trend <b style="color:${lastUp?"var(--green)":"var(--red)"}">${lastUp?"UP":"DOWN"}</b></span>`+
+    `<span>RSI(14) <b>${S.haRsi!=null?S.haRsi.toFixed(1):"—"}</b></span>`;
+}
+
+function renderDash(){
+  const n=S.bars.length; if(!n) return;
+  const k=S.bars[n-1], buy=k.tb, sell=Math.max(0,k.v-k.tb);
+  const dp=k.v? S.delta[n-1]/k.v*100 : 0;
+  const fc=computeForecast(), up=fc?fc.up:null;
+  const sLast=S.signals[S.signals.length-1];
+  const sigNow = sLast && sLast.i>=n-3 ? sLast.type.toUpperCase() : "WAIT";
+  const sigCol = sigNow==="BUY"?"var(--green)":sigNow==="SELL"?"var(--red)":"var(--amber)";
+  const row=(kk,vv,c)=>`<div class="dr"><span class="k">${kk}</span><span class="v" style="color:${c||"var(--text)"}">${vv}</span></div>`;
+  $("dash").innerHTML =
+    `<div class="dr hd"><span>NaatAI OFC</span><span>${S.interval}</span></div>`+
+    row("Buy Vol",fmtSig(buy),"var(--green)")+
+    row("Sell Vol",fmtSig(sell),"var(--red)")+
+    row("Delta",(S.delta[n-1]>=0?"+":"")+fmtSig(S.delta[n-1])+" ("+(dp>=0?"+":"")+dp.toFixed(0)+"%)",
+        S.delta[n-1]>=0?"var(--green)":"var(--red)")+
+    row("Cum Delta",(S.cvd[n-1]>=0?"+":"")+fmtSig(S.cvd[n-1]),S.cvd[n-1]>=0?"var(--green)":"var(--red)")+
+    row("RSI(14)",S.rsi[n-1]!=null?S.rsi[n-1].toFixed(1):"—")+
+    row("Fib 0.618",S.fib?fmt(S.fib.f618):"—")+
+    (up!=null?row("Next candle","▲ "+up.toFixed(0)+"%  ▼ "+(100-up).toFixed(0)+"%",up>=50?"var(--green)":"var(--red)"):"")+
+    row("HTF trend (4h)",S.htfUp==null?"—":S.htfUp?"UP":"DOWN",
+        S.htfUp==null?"var(--muted)":S.htfUp?"var(--green)":"var(--red)")+
+    row("Signal",sigNow,sigCol);
 }
 
 function drawCrosshair(p,kind){
@@ -1105,7 +1416,7 @@ function startLive(){
     liveDot(false,"polling");
     S.pollTimer=setInterval(loadAll,15000);
   }
-  S.oiTimer=setInterval(()=>{ loadOI(); loadLS(); },60000);
+  S.oiTimer=setInterval(()=>{ loadOI(); loadLS(); loadHA(); },60000);
 }
 let klineRenderAt=0;
 function onKline(k){
@@ -1119,14 +1430,14 @@ function onKline(k){
   if (!isNew && now-klineRenderAt<350) return;
   klineRenderAt=now;
   computeAll();
-  renderStats(); renderChips(); renderZones(); drawAll(); renderForecast();
+  renderStats(); renderChips(); renderZones(); drawAll(); renderForecast(); renderDash();
 }
 function demoTick(){
   const b=S.bars, last=b[b.length-1];
   const c=last.c*(1+(Math.random()-.5)*.0012);
   const dv=Math.random()*8+1, buy=Math.random()>.5?dv:0;
   b[b.length-1]={...last, c, h:Math.max(last.h,c), l:Math.min(last.l,c), v:last.v+dv, tb:last.tb+buy};
-  computeAll(); renderStats(); renderChips(); drawAll(); renderForecast();
+  computeAll(); renderStats(); renderChips(); drawAll(); renderForecast(); renderDash();
 }
 
 /* ============================ calculator ============================ */
