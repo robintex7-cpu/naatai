@@ -9,7 +9,8 @@ indicator("NaatAI OrderFlow Candles", "NaatAI OFC", overlay=true,
 
 // ─────────────────────────── Inputs ───────────────────────────
 grpS     = "Signals"
-deltaThr = input.float(15,  "Delta threshold (%)",        minval=5, maxval=50, group=grpS)
+deltaThr = input.float(20,  "Delta threshold (%)",        minval=5, maxval=50, group=grpS)
+sigVolX  = input.float(1.2, "Min volume (× 50-bar avg)",  step=0.1, group=grpS)
 htfTf    = input.timeframe("240", "Higher-timeframe trend", group=grpS)
 sigSpace = input.int(5,     "Min bars between signals",   minval=1, group=grpS)
 atrMult  = input.float(1.5, "Stop-loss = ATR ×",          step=0.1, group=grpS)
@@ -101,8 +102,10 @@ if showFib and barstate.islast
     label.set_textcolor(fl3, cGreen)
 
 // ─────────────────────── Signal engine ───────────────────────
-buyOK  = deltaPct >= deltaThr  and htfUp     and rsi < 70
-sellOK = deltaPct <= -deltaThr and not htfUp and rsi > 30
+sigVolAvg = ta.sma(volume, 50)
+volOK  = volume >= sigVolX * sigVolAvg   // delta% on a quiet candle is noise
+buyOK  = deltaPct >= deltaThr  and htfUp     and rsi < 70 and volOK
+sellOK = deltaPct <= -deltaThr and not htfUp and rsi > 30 and volOK
 var int lastSigBar = na
 canSig  = na(lastSigBar) or bar_index - lastSigBar >= sigSpace
 buySig  = buyOK  and canSig and barstate.isconfirmed and bar_index > 50
