@@ -1496,6 +1496,10 @@ function setupControls(){
   });
 }
 
+// deep link: chart.html?symbol=ETHUSDT (from the bot page) preloads that pair
+const _qsym = new URLSearchParams(location.search).get("symbol");
+if (_qsym){ S.symbol = _qsym.toUpperCase(); $("symInput").value = S.symbol; }
+
 setupPanes();
 setupControls();
 setupInteraction();

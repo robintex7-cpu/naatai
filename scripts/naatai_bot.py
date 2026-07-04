@@ -26,9 +26,10 @@ from pathlib import Path
 BASE = "https://data-api.binance.vision/api/v3"
 OUT = Path(__file__).resolve().parents[1] / "docs" / "signals.json"
 
-# Symbols to scan (Binance spot symbols; they track the perps 1:1 in direction).
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
-           "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "LTCUSDT"]
+# Universe: scan every liquid USDT pair on Binance, ranked by 24h $ volume.
+# One bulk /ticker/24hr call returns all symbols, so building the list is cheap.
+MIN_VOL_USD = 3_000_000   # skip pairs with < $3M 24h volume (illiquid = noise)
+MAX_SYMBOLS = 150         # cap the deep scan so a run finishes inside the cron window
 
 # Signal engine parameters - identical to chart.html and the Pine scripts.
 THR = 20.0        # delta % threshold
@@ -127,7 +128,7 @@ def heikin_ashi(bars):
     return out
 
 
-def fib_618(bars) -> float | None:
+def fib_levels(bars) -> dict | None:
     look = bars[-100:] if len(bars) >= 100 else bars
     if len(look) < 20:
         return None
@@ -136,7 +137,25 @@ def fib_618(bars) -> float | None:
     hi_i = max(range(len(look)), key=lambda i: look[i]["h"])
     lo_i = min(range(len(look)), key=lambda i: look[i]["l"])
     up = hi_i > lo_i
-    return hh - (hh - ll) * 0.618 if up else ll + (hh - ll) * 0.618
+    at = lambda r: hh - (hh - ll) * r if up else ll + (hh - ll) * r
+    return {"f382": at(0.382), "f500": at(0.5), "f618": at(0.618)}
+
+
+def support_resistance(bars, price, k=8):
+    """Classic S/R from swing pivots: nearest swing-low below price = support,
+    nearest swing-high above = resistance. Returns up to 2 of each, sorted by
+    distance from price."""
+    n = len(bars)
+    highs, lows = [], []
+    for i in range(k, n - k):
+        h, l = bars[i]["h"], bars[i]["l"]
+        if all(bars[j]["h"] <= h for j in range(i - k, i + k + 1)):
+            highs.append(h)
+        if all(bars[j]["l"] >= l for j in range(i - k, i + k + 1)):
+            lows.append(l)
+    res = sorted({round(h, 8) for h in highs if h > price}, key=lambda x: x - price)[:2]
+    sup = sorted({round(l, 8) for l in lows if l < price}, key=lambda x: price - x)[:2]
+    return sup, res
 
 
 def analyse(symbol: str) -> dict:
@@ -165,15 +184,11 @@ def analyse(symbol: str) -> dict:
             s -= bars[i - 50]["v"]
         vavg[i] = s / min(i + 1, 50)
 
-    # higher-timeframe (4h) trend
-    try:
-        c4 = [b["c"] for b in klines(symbol, "4h", 120)]
-        h20, h50 = ema(c4, 20), ema(c4, 50)
-        htf_up = None
-        if h20[-1] is not None and h50[-1] is not None:
-            htf_up = h20[-1] > h50[-1]
-    except Exception:  # noqa: BLE001
-        htf_up = None
+    # Trend gate for the cheap scan: EMA50 > EMA200 on the 15m data itself
+    # (a proxy). Symbols that fire a signal get the real 4h check in pass 2.
+    htf_up = None
+    if e50[-1] is not None and e200[-1] is not None:
+        htf_up = e50[-1] > e200[-1]
 
     # signal engine (closed candles only)
     signals = []
@@ -215,15 +230,8 @@ def analyse(symbol: str) -> dict:
              + (0.3 if last["c"] > (e20[-1] or last["c"]) else -0.3))
     up_prob = max(15.0, min(85.0, 50 + 50 * math.tanh(score)))
 
-    # Heikin Ashi trend (1h)
-    try:
-        h1 = klines(symbol, "1h", 200)
-        ha = heikin_ashi(h1)
-        ha_up = ha[-1]["c"] >= ha[-1]["o"]
-        ha_rsi = rsi_series([b["c"] for b in h1], 14)[-1]
-        ha_flip = ha_up != (ha[-2]["c"] >= ha[-2]["o"]) if len(ha) > 1 else False
-    except Exception:  # noqa: BLE001
-        ha_up, ha_rsi, ha_flip = None, None, False
+    # Heikin Ashi (1h) is enriched in pass 2 only for symbols with a signal.
+    ha_up, ha_rsi, ha_flip = None, None, False
 
     # trend label from EMA stack
     c = last["c"]
@@ -237,11 +245,20 @@ def analyse(symbol: str) -> dict:
         trend = "Down (choppy)"
 
     recent = signals[-1] if signals else None
-    # "live" signal = a signal on one of the last 3 closed candles
+    # "live" signal = a signal on one of the last 3 closed candles, but only if
+    # the current next-candle bias still agrees (a signal that already flipped
+    # is not worth chasing - keeps each card internally consistent).
     live_sig = recent["type"] if recent and recent["i"] >= n - 4 else "WAIT"
+    if live_sig == "BUY" and up_prob < 50:
+        live_sig = "WAIT"
+    elif live_sig == "SELL" and up_prob > 50:
+        live_sig = "WAIT"
 
     dec = 1 if c >= 1000 else 2 if c >= 100 else 4 if c >= 1 else 6
     rnd = lambda x: round(x, dec) if x is not None else None
+
+    fib = fib_levels(bars)
+    sup, res = support_resistance(bars, c)
 
     return {
         "symbol": symbol,
@@ -256,7 +273,11 @@ def analyse(symbol: str) -> dict:
         "buy_vol": round((last["v"] + delta[-1]) / 2, 1),
         "sell_vol": round((last["v"] - delta[-1]) / 2, 1),
         "atr": round(atr[-1], dec) if atr[-1] is not None else None,
-        "fib_618": rnd(fib_618(bars)),
+        "fib_382": rnd(fib["f382"]) if fib else None,
+        "fib_500": rnd(fib["f500"]) if fib else None,
+        "fib_618": rnd(fib["f618"]) if fib else None,
+        "support": [rnd(x) for x in sup],
+        "resistance": [rnd(x) for x in res],
         "up_prob": round(up_prob),
         "ha_up": ha_up,
         "ha_rsi": round(ha_rsi, 1) if ha_rsi is not None else None,
@@ -275,18 +296,76 @@ def analyse(symbol: str) -> dict:
     }
 
 
+def enrich(symbol: str, r: dict) -> None:
+    """Pass 2 - real 4h trend filter + 1h Heikin Ashi, only for signal pairs.
+    If the true 4h trend disagrees with the signal direction, downgrade it to
+    WAIT (keeps the same discipline the chart and Pine scripts enforce)."""
+    try:
+        c4 = [b["c"] for b in klines(symbol, "4h", 120)]
+        h20, h50 = ema(c4, 20), ema(c4, 50)
+        if h20[-1] is not None and h50[-1] is not None:
+            htf_up = h20[-1] > h50[-1]
+            r["htf_up"] = htf_up
+            if r["signal"] == "BUY" and not htf_up:
+                r["signal"] = "WAIT"
+            elif r["signal"] == "SELL" and htf_up:
+                r["signal"] = "WAIT"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        h1 = klines(symbol, "1h", 200)
+        ha = heikin_ashi(h1)
+        r["ha_up"] = ha[-1]["c"] >= ha[-1]["o"]
+        rr_ = rsi_series([b["c"] for b in h1], 14)[-1]
+        r["ha_rsi"] = round(rr_, 1) if rr_ is not None else None
+        r["ha_flip"] = len(ha) > 1 and r["ha_up"] != (ha[-2]["c"] >= ha[-2]["o"])
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def universe() -> list[tuple[str, float]]:
+    """All liquid USDT pairs, ranked by 24h dollar volume - one bulk call."""
+    tickers = _get("/ticker/24hr", {})
+    rows = []
+    for t in tickers:
+        sym = t["symbol"]
+        if not sym.endswith("USDT"):
+            continue
+        # skip leveraged tokens and stable-on-stable pairs
+        if any(x in sym for x in ("UPUSDT", "DOWNUSDT", "BULLUSDT", "BEARUSDT")):
+            continue
+        if sym in ("USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "BUSDUSDT", "EURUSDT"):
+            continue
+        vol = float(t.get("quoteVolume") or 0)
+        if vol >= MIN_VOL_USD:
+            rows.append((sym, vol))
+    rows.sort(key=lambda x: -x[1])
+    return rows[:MAX_SYMBOLS]
+
+
 def main() -> None:
-    print(f"NaatAI bot scanning {len(SYMBOLS)} symbols via {BASE} ...")
+    uni = universe()
+    print(f"NaatAI bot scanning {len(uni)} liquid USDT pairs via {BASE} ...")
     results = []
-    for sym in SYMBOLS:
+    for sym, vol in uni:
         try:
             r = analyse(sym)
+            r["vol_24h_usd"] = round(vol)
             results.append(r)
-            print(f"  {sym:9s} {r['signal']:4s} price={r['price']} "
-                  f"delta%={r['delta_pct']} htf={r['htf_up']} up={r['up_prob']}%")
         except Exception as e:  # noqa: BLE001
-            print(f"  {sym}: FAILED {e}")
-        time.sleep(0.4)
+            print(f"  {sym}: skip ({e})")
+        time.sleep(0.12)
+    print(f"Pass 1: scanned {len(results)} pairs.")
+
+    # Pass 2: real 4h trend + 1h Heikin Ashi only for pairs that fired a signal.
+    fired = [r for r in results if r["signal"] != "WAIT"]
+    for r in fired:
+        enrich(r["symbol"], r)
+        if r["signal"] != "WAIT":
+            print(f"  {r['symbol']:12s} {r['signal']:4s} price={r['price']} "
+                  f"delta%={r['delta_pct']} 4h={r['htf_up']} up={r['up_prob']}%")
+        time.sleep(0.12)
+    print(f"Pass 2: enriched {len(fired)} signal pairs.")
 
     # rank: live BUY/SELL first, then by conviction (distance of up_prob from 50)
     def rank(r):
@@ -298,6 +377,8 @@ def main() -> None:
         "meta": {
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "Binance public data mirror (data-api.binance.vision), 15m klines",
+            "universe": len(results),
+            "min_vol_usd": MIN_VOL_USD,
             "engine": {
                 "delta_threshold_pct": THR, "min_volume_x_avg": VOL_MULT,
                 "min_bars_between_signals": SPACE,
