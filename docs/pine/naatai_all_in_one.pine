@@ -29,7 +29,6 @@ zVolX     = input.float(1.15,"Zone volume spike (x avg)", step=0.05, group=gZ)
 maxZones  = input.int(3,     "Max zones per side", minval=1, maxval=8, group=gZ)
 
 gF = "Order flow / display"
-lowerTf  = input.timeframe("1", "Lower timeframe for delta", group=gF)
 lblCount = input.int(12,    "Candles with volume labels", minval=0, maxval=40, group=gF)
 fibLen   = input.int(100,   "Swing lookback for fib",     minval=20, group=gF)
 showFib  = input.bool(true, "Show fib retracement",       group=gF)
@@ -42,15 +41,22 @@ cAmb   = #f5a623
 cBlue  = #4d9fff
 cViol  = #8b7cf0
 
-// ------------------------- Delta / CVD ------------------------------
-dArr = request.security_lower_tf(syminfo.tickerid, lowerTf,
-     close > open ? volume : close < open ? -volume : 0.0)
-float delta = array.size(dArr) > 0 ? array.sum(dArr) :
-     close > open ? volume : close < open ? -volume : 0.0
+// ------------------- Delta / CVD (deterministic) --------------------
+// Delta is estimated from each candle's own OHLCV - how far the close sits
+// inside the bar's range - so it is IDENTICAL on every account and every plan.
+// (Tick-level bid/ask delta is not available in Pine. request.security_lower_tf
+// returns a plan-dependent number of intrabars, which is exactly why the old
+// version showed different Delta / Cum Delta on two accounts for the same pair.)
+rng     = high - low
+buyVol  = rng > 0 ? volume * (close - low) / rng : volume * 0.5
+sellVol = rng > 0 ? volume * (high - close) / rng : volume * 0.5
+delta   = buyVol - sellVol
 deltaPct = volume > 0 ? delta / volume * 100 : 0.0
-buyVol   = (volume + delta) / 2
-sellVol  = (volume - delta) / 2
-cumDelta = ta.cum(delta)
+// Cumulative delta anchored to the UTC day, so it is comparable across accounts
+// regardless of how much history each one happens to load.
+newDay = ta.change(time("D")) != 0
+var float cumDelta = 0.0
+cumDelta := (newDay ? 0.0 : cumDelta) + delta
 
 // ------------------------- Context ----------------------------------
 rsi   = ta.rsi(close, 14)
@@ -264,7 +270,7 @@ if showTbl and barstate.islast
     table.cell(tbl, 1, 3, (delta >= 0 ? "+" : "") + str.tostring(delta, format.volume) +
          " (" + (deltaPct >= 0 ? "+" : "") + str.tostring(deltaPct, "#") + "%)",
          text_color=delta >= 0 ? cGreen : cRed, text_size=size.small)
-    table.cell(tbl, 0, 4, "Cum Delta", text_color=mut, text_size=size.small)
+    table.cell(tbl, 0, 4, "Cum Delta (day)", text_color=mut, text_size=size.small)
     table.cell(tbl, 1, 4, (cumDelta >= 0 ? "+" : "") + str.tostring(cumDelta, format.volume),
          text_color=cumDelta >= 0 ? cGreen : cRed, text_size=size.small)
     table.cell(tbl, 0, 5, "RSI(14)", text_color=mut, text_size=size.small)
