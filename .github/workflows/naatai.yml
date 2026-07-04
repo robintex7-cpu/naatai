@@ -1,0 +1,40 @@
+name: NaatAI Order-Flow Bot
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/naatai_bot.py"
+      - ".github/workflows/naatai.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: naatai-bot
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run NaatAI bot
+        run: python scripts/naatai_bot.py
+      - name: Commit updated signals
+        run: |
+          git config user.name  "naatai-bot"
+          git config user.email "actions@github.com"
+          git add docs/signals.json
+          if git diff --staged --quiet; then
+            echo "No change in signals."
+          else
+            git commit -m "bot: refresh order-flow signals [skip ci]"
+            git push
+          fi
