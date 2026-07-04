@@ -1,15 +1,32 @@
 //@version=5
-// NaatAI OrderFlow - all-in-one main-chart port of the naatai web chart.
-// Includes: EMA 20/50/200, session VWAP, institutional supply/demand zones,
-// auto-fib retracement, delta + cumulative delta, CVD divergence, BUY/SELL
-// signals at candle close with printed ENTRY / SL / TP and shaded R/R boxes,
-// per-candle volume + delta labels, and the NaatAI dashboard.
-// Add "NaatAI Heikin Ashi Panel" (separate script) in a pane below to
-// reproduce the bottom panel of the web chart.
+// NaatAI OrderFlow - all-in-one main-chart indicator.
+// Multi-exchange aggregated volume/delta (Binance + Coinbase + MEXC + BingX via
+// TradingView feeds), NaatAI-style candles, EMA 20/50/200, session VWAP,
+// institutional supply/demand zones, auto-fib, delta + cumulative delta, CVD
+// divergence, BUY/SELL signals at candle close with printed ENTRY/SL/TP,
+// per-candle volume+delta labels, and the NaatAI dashboard.
+//
+// Signals are non-repainting: they only evaluate on confirmed (closed) bars and
+// every request.security uses the default lookahead_off. Delta is computed from
+// each candle's own OHLCV, so it reads the SAME on every account and plan.
+//
+// NOTE: Pine cannot fetch CoinGecko (it has no TradingView chart feed) or any
+// exchange REST API - request.security can only read exchanges TradingView
+// carries. Full 5-source API aggregation lives in the web chart / bot.
 indicator("NaatAI OrderFlow", "NaatAI", overlay=true,
      max_labels_count=500, max_lines_count=500, max_boxes_count=200)
 
 // ----------------------------- Inputs ------------------------------
+gC = "Candles"
+naatCandles = input.bool(true, "Draw NaatAI candles (hide the default candles in chart settings)", group=gC)
+
+gX = "Multi-exchange aggregation (TradingView feeds)"
+useAgg    = input.bool(true, "Aggregate volume + delta across exchanges", group=gX)
+exBinance = input.bool(true, "Binance",  inline="ex1", group=gX)
+exCoinbase= input.bool(true, "Coinbase", inline="ex1", group=gX)
+exMexc    = input.bool(true, "MEXC",     inline="ex2", group=gX)
+exBingx   = input.bool(true, "BingX",    inline="ex2", group=gX)
+
 gT = "Trend layer"
 showEMA  = input.bool(true, "EMA 20 / 50 / 200", group=gT)
 showVWAP = input.bool(true, "Session VWAP",      group=gT)
@@ -41,19 +58,45 @@ cAmb   = #f5a623
 cBlue  = #4d9fff
 cViol  = #8b7cf0
 
-// ------------------- Delta / CVD (deterministic) --------------------
-// Delta is estimated from each candle's own OHLCV - how far the close sits
-// inside the bar's range - so it is IDENTICAL on every account and every plan.
-// (Tick-level bid/ask delta is not available in Pine. request.security_lower_tf
-// returns a plan-dependent number of intrabars, which is exactly why the old
-// version showed different Delta / Cum Delta on two accounts for the same pair.)
-rng     = high - low
-buyVol  = rng > 0 ? volume * (close - low) / rng : volume * 0.5
-sellVol = rng > 0 ? volume * (high - close) / rng : volume * 0.5
-delta   = buyVol - sellVol
-deltaPct = volume > 0 ? delta / volume * 100 : 0.0
-// Cumulative delta anchored to the UTC day, so it is comparable across accounts
-// regardless of how much history each one happens to load.
+// ------------- NaatAI candles (visually replace the default) --------
+cCol = close >= open ? cGreen : cRed
+plotcandle(naatCandles ? open : na, naatCandles ? high : na, naatCandles ? low : na,
+     naatCandles ? close : na, "NaatAI candles", color=cCol, wickcolor=cCol, bordercolor=cCol)
+
+// --------- Multi-exchange aggregated volume + delta (deterministic) -
+// Each exchange's delta is estimated from its own OHLCV (where the close sits
+// in the bar range). Missing feeds return na and are skipped. Everything is on
+// the chart timeframe with lookahead_off, so nothing repaints.
+base = syminfo.basecurrency
+[hB, lB, cB, vB] = request.security("BINANCE:"  + base + "USDT", timeframe.period, [high, low, close, volume], ignore_invalid_symbol=true)
+[hC, lC, cC, vC] = request.security("COINBASE:" + base + "USD",  timeframe.period, [high, low, close, volume], ignore_invalid_symbol=true)
+[hM, lM, cM, vM] = request.security("MEXC:"     + base + "USDT", timeframe.period, [high, low, close, volume], ignore_invalid_symbol=true)
+[hX, lX, cX, vX] = request.security("BINGX:"    + base + "USDT", timeframe.period, [high, low, close, volume], ignore_invalid_symbol=true)
+
+exDelta(_on, _h, _l, _c, _v) =>
+    r_ = _h - _l
+    ok_ = _on and not na(_v) and r_ > 0
+    vv_ = ok_ ? _v : 0.0
+    dd_ = ok_ ? _v * ((_c - _l) - (_h - _c)) / r_ : 0.0
+    cc_ = ok_ ? 1 : 0
+    [vv_, dd_, cc_]
+
+[avB, adB, cntB] = exDelta(useAgg and exBinance,  hB, lB, cB, vB)
+[avC, adC, cntC] = exDelta(useAgg and exCoinbase, hC, lC, cC, vC)
+[avM, adM, cntM] = exDelta(useAgg and exMexc,     hM, lM, cM, vM)
+[avX, adX, cntX] = exDelta(useAgg and exBingx,    hX, lX, cX, vX)
+exCount = cntB + cntC + cntM + cntX
+
+// chart's own candle as the fallback when aggregation is off / nothing resolved
+rngL     = high - low
+locDelta = rngL > 0 ? volume * ((close - low) - (high - close)) / rngL : 0.0
+
+vol    = (useAgg and exCount > 0) ? (avB + avC + avM + avX) : volume
+delta  = (useAgg and exCount > 0) ? (adB + adC + adM + adX) : locDelta
+buyVol  = (vol + delta) / 2
+sellVol = (vol - delta) / 2
+deltaPct = vol > 0 ? delta / vol * 100 : 0.0
+// Cumulative delta anchored to the UTC day, comparable across accounts.
 newDay = timeframe.change("D")
 var float cumDelta = 0.0
 cumDelta := (newDay ? 0.0 : cumDelta) + delta
@@ -76,7 +119,7 @@ plot(showVWAP ? vwap   : na, "VWAP",    color=#d55181, linewidth=1, style=plot.s
 // ------------- Per-candle volume + delta% labels --------------------
 var label[] volLbls = array.new<label>()
 if lblCount > 0 and barstate.isconfirmed
-    array.push(volLbls, label.new(bar_index, high, "V:" + str.tostring(volume, format.volume),
+    array.push(volLbls, label.new(bar_index, high, "V:" + str.tostring(vol, format.volume),
          yloc=yloc.abovebar, style=label.style_none, textcolor=color.new(cMut, 15), size=size.tiny))
     array.push(volLbls, label.new(bar_index, low,
          (deltaPct >= 0 ? "+" : "") + str.tostring(deltaPct, "#") + "%",
@@ -150,7 +193,6 @@ if showZones and not na(pl) and volume[pivLen] > zVolX * zVolAvg[pivLen]
              text="DEMAND", text_color=color.new(cGreen, 20), text_size=size.tiny, text_halign=text.align_left))
         if array.size(demBoxes) > maxZones
             box.delete(array.shift(demBoxes))
-// invalidate broken zones
 if array.size(supBoxes) > 0
     for i = array.size(supBoxes) - 1 to 0
         b = array.get(supBoxes, i)
@@ -252,7 +294,7 @@ score  = deltaPct / 25.0 + (htfUp ? 0.5 : -0.5) +
 upProb = math.max(15.0, math.min(85.0, 50 + 50 * f_tanh(score)))
 
 // ------------------------- Dashboard --------------------------------
-var table tbl = table.new(position.top_right, 2, 11,
+var table tbl = table.new(position.top_right, 2, 12,
      bgcolor=color.new(#131823, 8), border_color=color.new(#232b3a, 0), border_width=1)
 if showTbl and barstate.islast
     txt = color.new(#e6edf3, 0)
@@ -260,32 +302,35 @@ if showTbl and barstate.islast
     sigTxt = buyOK ? "BUY" : sellOK ? "SELL" : "WAIT"
     sigCol = buyOK ? cGreen : sellOK ? cRed : cAmb
     zTxt = inDemand ? "In demand" : inSupply ? "In supply" : "-"
+    srcTxt = (useAgg and exCount > 0) ? str.tostring(exCount) + " exchanges" : "chart only"
     table.cell(tbl, 0, 0, "NaatAI OFC", text_color=cBlue, text_size=size.small)
     table.cell(tbl, 1, 0, timeframe.period, text_color=cBlue, text_size=size.small)
-    table.cell(tbl, 0, 1, "Buy Vol", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 1, str.tostring(buyVol, format.volume), text_color=cGreen, text_size=size.small)
-    table.cell(tbl, 0, 2, "Sell Vol", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 2, str.tostring(sellVol, format.volume), text_color=cRed, text_size=size.small)
-    table.cell(tbl, 0, 3, "Delta", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 3, (delta >= 0 ? "+" : "") + str.tostring(delta, format.volume) +
+    table.cell(tbl, 0, 1, "Volume src", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 1, srcTxt, text_color=txt, text_size=size.small)
+    table.cell(tbl, 0, 2, "Buy Vol", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(buyVol, format.volume), text_color=cGreen, text_size=size.small)
+    table.cell(tbl, 0, 3, "Sell Vol", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(sellVol, format.volume), text_color=cRed, text_size=size.small)
+    table.cell(tbl, 0, 4, "Delta", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 4, (delta >= 0 ? "+" : "") + str.tostring(delta, format.volume) +
          " (" + (deltaPct >= 0 ? "+" : "") + str.tostring(deltaPct, "#") + "%)",
          text_color=delta >= 0 ? cGreen : cRed, text_size=size.small)
-    table.cell(tbl, 0, 4, "Cum Delta (day)", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 4, (cumDelta >= 0 ? "+" : "") + str.tostring(cumDelta, format.volume),
+    table.cell(tbl, 0, 5, "Cum Delta (day)", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 5, (cumDelta >= 0 ? "+" : "") + str.tostring(cumDelta, format.volume),
          text_color=cumDelta >= 0 ? cGreen : cRed, text_size=size.small)
-    table.cell(tbl, 0, 5, "RSI(14)", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 5, str.tostring(rsi, "#.#"), text_color=txt, text_size=size.small)
-    table.cell(tbl, 0, 6, "Fib 0.618", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 6, str.tostring(fib618, format.mintick), text_color=txt, text_size=size.small)
-    table.cell(tbl, 0, 7, "Next candle", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 7, "UP " + str.tostring(upProb, "#") + "% / DN " + str.tostring(100 - upProb, "#") + "%",
+    table.cell(tbl, 0, 6, "RSI(14)", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 6, str.tostring(rsi, "#.#"), text_color=txt, text_size=size.small)
+    table.cell(tbl, 0, 7, "Fib 0.618", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 7, str.tostring(fib618, format.mintick), text_color=txt, text_size=size.small)
+    table.cell(tbl, 0, 8, "Next candle", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 8, "UP " + str.tostring(upProb, "#") + "% / DN " + str.tostring(100 - upProb, "#") + "%",
          text_color=upProb >= 50 ? cGreen : cRed, text_size=size.small)
-    table.cell(tbl, 0, 8, "Zone", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 8, zTxt, text_color=inDemand ? cGreen : inSupply ? cRed : txt, text_size=size.small)
-    table.cell(tbl, 0, 9, "HTF trend (" + htfTf + ")", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 9, htfUp ? "UP" : "DOWN", text_color=htfUp ? cGreen : cRed, text_size=size.small)
-    table.cell(tbl, 0, 10, "Signal", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 10, sigTxt, text_color=sigCol, text_size=size.normal)
+    table.cell(tbl, 0, 9, "Zone", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 9, zTxt, text_color=inDemand ? cGreen : inSupply ? cRed : txt, text_size=size.small)
+    table.cell(tbl, 0, 10, "HTF trend (" + htfTf + ")", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 10, htfUp ? "UP" : "DOWN", text_color=htfUp ? cGreen : cRed, text_size=size.small)
+    table.cell(tbl, 0, 11, "Signal", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 11, sigTxt, text_color=sigCol, text_size=size.normal)
 
 // ------------------------------ Alerts ------------------------------
 alertcondition(buySig,  "NaatAI BUY",  "NaatAI: BUY signal on {{ticker}} {{interval}}")
