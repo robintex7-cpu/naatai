@@ -54,7 +54,7 @@ delta   = buyVol - sellVol
 deltaPct = volume > 0 ? delta / volume * 100 : 0.0
 // Cumulative delta anchored to the UTC day, so it is comparable across accounts
 // regardless of how much history each one happens to load.
-newDay = ta.change(time("D")) != 0
+newDay = timeframe.change("D")
 var float cumDelta = 0.0
 cumDelta := (newDay ? 0.0 : cumDelta) + delta
 
