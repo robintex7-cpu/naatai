@@ -17,9 +17,10 @@ indicator("NaatAI OrderFlow", "NaatAI", overlay=true,
      max_labels_count=500, max_lines_count=500, max_boxes_count=200)
 
 // ----------------------------- Inputs ------------------------------
-gC = "Candles"
-naatCandles = input.bool(true, "Draw NaatAI candles (hide the default candles in chart settings)", group=gC)
-
+// This is an OVERLAY on your normal candlesticks - set the chart to "Candles"
+// style (top toolbar) and it looks exactly like the mock. The indicator does
+// NOT redraw candles (that caused a doubled/messy look); it only adds the
+// dashboard, signals, fib, zones, EMAs and labels on top.
 gX = "Multi-exchange aggregation (TradingView feeds)"
 useAgg    = input.bool(true, "Aggregate volume + delta across exchanges", group=gX)
 exBinance = input.bool(true, "Binance",  inline="ex1", group=gX)
@@ -57,11 +58,6 @@ cMut   = #8b98a9
 cAmb   = #f5a623
 cBlue  = #4d9fff
 cViol  = #8b7cf0
-
-// ------------- NaatAI candles (visually replace the default) --------
-cCol = close >= open ? cGreen : cRed
-plotcandle(naatCandles ? open : na, naatCandles ? high : na, naatCandles ? low : na,
-     naatCandles ? close : na, "NaatAI candles", color=cCol, wickcolor=cCol, bordercolor=cCol)
 
 // --------- Multi-exchange aggregated volume + delta (deterministic) -
 // Each exchange's delta is estimated from its own OHLCV (where the close sits
