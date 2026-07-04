@@ -1,7 +1,7 @@
 //@version=5
-// NaatAI Heikin Ashi Panel — companion pane for "NaatAI OrderFlow Candles".
+// NaatAI Heikin Ashi Panel - companion pane for "NaatAI OrderFlow Candles".
 // Shows higher-timeframe Heikin Ashi candles (default 1h) with a trend/RSI
-// table and a flip marker. Add it below the main chart: it loads in its own
+// table and flip markers. Add it below the main chart: it loads in its own
 // pane automatically (overlay=false).
 indicator("NaatAI Heikin Ashi Panel", "NaatAI HA", overlay=false, format=format.price)
 
@@ -15,7 +15,7 @@ haTicker = ticker.heikinashi(syminfo.tickerid)
 [haO, haH, haL, haC] = request.security(haTicker, haTf, [open, high, low, close])
 haRsi = request.security(syminfo.tickerid, haTf, ta.rsi(close, 14))
 
-haUp   = haC >= haO
+haUp    = haC >= haO
 candCol = haUp ? cGreen : cRed
 plotcandle(haO, haH, haL, haC, "Heikin Ashi", color=candCol,
      wickcolor=color.new(candCol, 30), bordercolor=candCol)

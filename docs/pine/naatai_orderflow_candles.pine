@@ -1,5 +1,5 @@
 //@version=5
-// NaatAI OrderFlow Candles — main-pane indicator matching the naatai mock:
+// NaatAI OrderFlow Candles - main-pane indicator.
 // BUY/SELL signals at candle close with printed ENTRY / SL / TP, per-candle
 // volume + delta% labels, auto-fib retracement (0.382 / 0.5 / 0.618),
 // higher-timeframe trend filter, and the full dashboard table.
@@ -7,21 +7,21 @@
 indicator("NaatAI OrderFlow Candles", "NaatAI OFC", overlay=true,
      max_labels_count=500, max_lines_count=500, max_boxes_count=100)
 
-// ─────────────────────────── Inputs ───────────────────────────
+// ----------------------------- Inputs ------------------------------
 grpS     = "Signals"
-deltaThr = input.float(20,  "Delta threshold (%)",        minval=5, maxval=50, group=grpS)
-sigVolX  = input.float(1.2, "Min volume (× 50-bar avg)",  step=0.1, group=grpS)
+deltaThr = input.float(20,  "Delta threshold (%)",          minval=5, maxval=50, group=grpS)
+sigVolX  = input.float(1.2, "Min volume (x 50-bar avg)",    step=0.1, group=grpS)
 htfTf    = input.timeframe("240", "Higher-timeframe trend", group=grpS)
-sigSpace = input.int(5,     "Min bars between signals",   minval=1, group=grpS)
-atrMult  = input.float(1.5, "Stop-loss = ATR ×",          step=0.1, group=grpS)
-rr       = input.float(2.0, "Take-profit (R multiple)",   step=0.5, group=grpS)
+sigSpace = input.int(5,     "Min bars between signals",     minval=1, group=grpS)
+atrMult  = input.float(1.5, "Stop-loss = ATR x",            step=0.1, group=grpS)
+rr       = input.float(2.0, "Take-profit (R multiple)",     step=0.5, group=grpS)
 grpF     = "Order flow"
 lowerTf  = input.timeframe("1", "Lower timeframe for delta", group=grpF)
-lblCount = input.int(12,    "Candles with V/Δ labels",    minval=0, maxval=40, group=grpF)
+lblCount = input.int(12,    "Candles with volume labels",   minval=0, maxval=40, group=grpF)
 grpX     = "Fib / display"
-fibLen   = input.int(100,   "Swing lookback for fib",     minval=20, group=grpX)
-showFib  = input.bool(true, "Show fib retracement",       group=grpX)
-showTbl  = input.bool(true, "Show dashboard",             group=grpX)
+fibLen   = input.int(100,   "Swing lookback for fib",       minval=20, group=grpX)
+showFib  = input.bool(true, "Show fib retracement",         group=grpX)
+showTbl  = input.bool(true, "Show dashboard",               group=grpX)
 
 cGreen = #2ecc71
 cRed   = #ff5c5c
@@ -29,9 +29,10 @@ cMut   = #8b98a9
 cAmb   = #f5a623
 cBlue  = #4d9fff
 
-// ───────────── Delta from lower-timeframe up/down volume ─────────────
+// ------------- Delta from lower-timeframe up/down volume -------------
 dArr = request.security_lower_tf(syminfo.tickerid, lowerTf,
      close > open ? volume : close < open ? -volume : 0.0)
+// fallback to chart-candle direction when intrabars are not available
 float delta = array.size(dArr) > 0 ? array.sum(dArr) :
      close > open ? volume : close < open ? -volume : 0.0
 deltaPct = volume > 0 ? delta / volume * 100 : 0.0
@@ -39,14 +40,14 @@ buyVol   = (volume + delta) / 2
 sellVol  = (volume - delta) / 2
 cumDelta = ta.cum(delta)
 
-// ─────────────────────── Context ───────────────────────
+// ----------------------------- Context -----------------------------
 rsi    = ta.rsi(close, 14)
 atr    = ta.atr(14)
 ema20  = ta.ema(close, 20)
 htfUp  = request.security(syminfo.tickerid, htfTf,
      ta.ema(close, 20) > ta.ema(close, 50)) == true
 
-// ─────────────── Per-candle volume + delta% labels ───────────────
+// --------------- Per-candle volume + delta% labels ------------------
 var label[] volLbls = array.new<label>()
 if lblCount > 0 and barstate.isconfirmed
     array.push(volLbls, label.new(bar_index, high,
@@ -60,7 +61,7 @@ if lblCount > 0 and barstate.isconfirmed
     while array.size(volLbls) > lblCount * 2
         label.delete(array.shift(volLbls))
 
-// ─────────────── Auto fib retracement of last swing ───────────────
+// --------------- Auto fib retracement of last swing -----------------
 hh = ta.highest(high, fibLen)
 ll = ta.lowest(low, fibLen)
 upSwing = ta.highestbars(high, fibLen) > ta.lowestbars(low, fibLen)  // high is more recent
@@ -78,7 +79,7 @@ var label fl3 = na
 if showFib and barstate.islast
     if na(f1)
         f1 := line.new(bar_index, fib382, bar_index, fib382, color=color.new(cBlue, 45), style=line.style_dotted)
-        f2 := line.new(bar_index, fib500, bar_index, fib500, color=color.new(cAmb, 45),  style=line.style_dotted)
+        f2 := line.new(bar_index, fib500, bar_index, fib500, color=color.new(cAmb, 45), style=line.style_dotted)
         f3 := line.new(bar_index, fib618, bar_index, fib618, color=color.new(cGreen, 45), style=line.style_dotted)
         fl1 := label.new(bar_index, fib382, "", style=label.style_none, size=size.tiny)
         fl2 := label.new(bar_index, fib500, "", style=label.style_none, size=size.tiny)
@@ -101,7 +102,7 @@ if showFib and barstate.islast
     label.set_text(fl3, "0.618 " + str.tostring(fib618, format.mintick))
     label.set_textcolor(fl3, cGreen)
 
-// ─────────────────────── Signal engine ───────────────────────
+// --------------------------- Signal engine --------------------------
 sigVolAvg = ta.sma(volume, 50)
 volOK  = volume >= sigVolX * sigVolAvg   // delta% on a quiet candle is noise
 buyOK  = deltaPct >= deltaThr  and htfUp     and rsi < 70 and volOK
@@ -114,7 +115,7 @@ sellSig = sellOK and canSig and barstate.isconfirmed and bar_index > 50
 plotshape(buySig,  "BUY",  shape.triangleup,   location.belowbar, cGreen, size=size.small, text="BUY",  textcolor=cGreen)
 plotshape(sellSig, "SELL", shape.triangledown, location.abovebar, cRed,   size=size.small, text="SELL", textcolor=cRed)
 
-// printed ENTRY / SL / TP with shaded reward & risk boxes (keep last 3 signals)
+// printed ENTRY / SL / TP with shaded reward and risk boxes (keep last 3 signals)
 var line[]  sigLines = array.new<line>()
 var label[] sigLbls  = array.new<label>()
 var box[]   sigBoxes = array.new<box>()
@@ -129,11 +130,11 @@ if buySig or sellSig
     array.push(sigBoxes, box.new(bar_index, math.max(entry, sl), xe, math.min(entry, sl),
          border_color=color.new(cRed, 80), bgcolor=color.new(cRed, 92)))
     array.push(sigLines, line.new(bar_index, entry, xe, entry, color=color.new(color.white, 30), style=line.style_dashed))
-    array.push(sigLines, line.new(bar_index, sl, xe, sl, color=color.new(cRed, 20),  style=line.style_dashed))
+    array.push(sigLines, line.new(bar_index, sl, xe, sl, color=color.new(cRed, 20), style=line.style_dashed))
     array.push(sigLines, line.new(bar_index, tp, xe, tp, color=color.new(cGreen, 20), style=line.style_dashed))
     array.push(sigLbls, label.new(xe, entry, "ENTRY " + str.tostring(entry, format.mintick),
          style=label.style_label_left, color=color.new(color.gray, 60), textcolor=color.white, size=size.small))
-    array.push(sigLbls, label.new(xe, sl, "SL " + str.tostring(sl, format.mintick) + " (−1R)",
+    array.push(sigLbls, label.new(xe, sl, "SL " + str.tostring(sl, format.mintick) + " (-1R)",
          style=label.style_label_left, color=color.new(cRed, 60), textcolor=color.white, size=size.small))
     array.push(sigLbls, label.new(xe, tp, "TP " + str.tostring(tp, format.mintick) + " (+" + str.tostring(rr, "#.#") + "R)",
          style=label.style_label_left, color=color.new(cGreen, 60), textcolor=color.white, size=size.small))
@@ -144,7 +145,7 @@ if buySig or sellSig
     while array.size(sigLbls) > 9
         label.delete(array.shift(sigLbls))
 
-// ─────────────── Next-candle probability (heuristic) ───────────────
+// --------------- Next-candle probability (heuristic) ----------------
 f_tanh(float x) =>
     xx = math.max(-10.0, math.min(10.0, x))
     e = math.exp(2 * xx)
@@ -153,7 +154,7 @@ score  = deltaPct / 25.0 + (htfUp ? 0.5 : -0.5) +
      (cumDelta > cumDelta[10] ? 0.4 : -0.4) + (close > ema20 ? 0.3 : -0.3)
 upProb = math.max(15.0, math.min(85.0, 50 + 50 * f_tanh(score)))
 
-// ─────────────────────── Dashboard table ───────────────────────
+// --------------------------- Dashboard table ------------------------
 var table tbl = table.new(position.top_right, 2, 10,
      bgcolor=color.new(#131823, 8), border_color=color.new(#232b3a, 0), border_width=1)
 if showTbl and barstate.islast
@@ -163,11 +164,11 @@ if showTbl and barstate.islast
     sigCol = buyOK ? cGreen : sellOK ? cRed : cAmb
     table.cell(tbl, 0, 0, "NaatAI OFC", text_color=cBlue, text_size=size.small)
     table.cell(tbl, 1, 0, timeframe.period, text_color=cBlue, text_size=size.small)
-    table.cell(tbl, 0, 1, "Buy Vol",  text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 1, str.tostring(buyVol, format.volume),  text_color=cGreen, text_size=size.small)
+    table.cell(tbl, 0, 1, "Buy Vol", text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 1, str.tostring(buyVol, format.volume), text_color=cGreen, text_size=size.small)
     table.cell(tbl, 0, 2, "Sell Vol", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 2, str.tostring(sellVol, format.volume), text_color=cRed,   text_size=size.small)
-    table.cell(tbl, 0, 3, "Delta",    text_color=mut, text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(sellVol, format.volume), text_color=cRed, text_size=size.small)
+    table.cell(tbl, 0, 3, "Delta", text_color=mut, text_size=size.small)
     table.cell(tbl, 1, 3, (delta >= 0 ? "+" : "") + str.tostring(delta, format.volume) +
          " (" + (deltaPct >= 0 ? "+" : "") + str.tostring(deltaPct, "#") + "%)",
          text_color=delta >= 0 ? cGreen : cRed, text_size=size.small)
@@ -179,13 +180,13 @@ if showTbl and barstate.islast
     table.cell(tbl, 0, 6, "Fib 0.618", text_color=mut, text_size=size.small)
     table.cell(tbl, 1, 6, str.tostring(fib618, format.mintick), text_color=txt, text_size=size.small)
     table.cell(tbl, 0, 7, "Next candle", text_color=mut, text_size=size.small)
-    table.cell(tbl, 1, 7, "▲ " + str.tostring(upProb, "#") + "%  ▼ " + str.tostring(100 - upProb, "#") + "%",
+    table.cell(tbl, 1, 7, "UP " + str.tostring(upProb, "#") + "% / DOWN " + str.tostring(100 - upProb, "#") + "%",
          text_color=upProb >= 50 ? cGreen : cRed, text_size=size.small)
     table.cell(tbl, 0, 8, "HTF trend (" + htfTf + ")", text_color=mut, text_size=size.small)
     table.cell(tbl, 1, 8, htfUp ? "UP" : "DOWN", text_color=htfUp ? cGreen : cRed, text_size=size.small)
     table.cell(tbl, 0, 9, "Signal", text_color=mut, text_size=size.small)
     table.cell(tbl, 1, 9, sigTxt, text_color=sigCol, text_size=size.normal)
 
-// ─────────────────────────── Alerts ───────────────────────────
+// ------------------------------ Alerts ------------------------------
 alertcondition(buySig,  "NaatAI BUY",  "NaatAI OFC: BUY signal on {{ticker}} {{interval}}")
 alertcondition(sellSig, "NaatAI SELL", "NaatAI OFC: SELL signal on {{ticker}} {{interval}}")
