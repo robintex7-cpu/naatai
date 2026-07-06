@@ -1,0 +1,115 @@
+//@version=5
+// NaatAI Mixed Signal - two-timeframe confluence.
+// This ONE indicator reads TWO "charts": the timeframe you are on, plus a higher
+// timeframe you choose. It only prints a BUY or SELL when BOTH agree (trend +
+// candle-momentum + RSI on each). Requiring two timeframes to line up filters out
+// most of the false signals a single chart gives. It is NOT 100% - no signal is;
+// always use the printed stop-loss.
+//
+// Overlay on your candles. The dashboard shows each timeframe's state and the
+// combined result, so you see the "two charts" in one screen.
+indicator("NaatAI Mixed Signal", "NaatAI Mixed", overlay=true,
+     max_labels_count=300, max_lines_count=300, max_boxes_count=100)
+
+// ------------------------------- Inputs ------------------------------
+tf2      = input.timeframe("60", "Second (higher) timeframe")
+emaFast  = input.int(20, "EMA fast", minval=2)
+emaSlow  = input.int(50, "EMA slow", minval=3)
+deltaThr = input.float(15, "Candle-momentum threshold (%)", minval=5, maxval=60)
+sigSpace = input.int(5,  "Min bars between signals", minval=1)
+atrMult  = input.float(1.5, "Stop-loss = ATR x", step=0.1)
+rr       = input.float(2.0, "Take-profit (R multiple)", step=0.5)
+showTbl  = input.bool(true, "Show dashboard")
+
+cGreen = #2ecc71
+cRed   = #ff5c5c
+cMut   = #8b98a9
+cAmb   = #f5a623
+cBlue  = #4d9fff
+
+// -------- One score per timeframe: trend + candle-momentum + RSI ------
+// Deterministic (uses only OHLC), so it reads the same on every account/plan.
+f_score() =>
+    ef = ta.ema(close, emaFast)
+    es = ta.ema(close, emaSlow)
+    r  = ta.rsi(close, 14)
+    rng = high - low
+    dp = rng > 0 ? ((close - low) - (high - close)) / rng * 100 : 0.0
+    trendUp = close > ef and ef > es
+    trendDn = close < ef and ef < es
+    sc = 0.0
+    sc += trendUp ? 1.0 : trendDn ? -1.0 : 0.0
+    sc += dp >= deltaThr ? 1.0 : dp <= -deltaThr ? -1.0 : 0.0
+    sc += r > 55 ? 0.5 : r < 45 ? -0.5 : 0.0
+    [sc, r, dp]
+
+[sc1, rsi1, dp1] = f_score()
+[sc2, rsi2, dp2] = request.security(syminfo.tickerid, tf2, f_score())
+
+// both timeframes must agree -> the "mixed" confluence signal
+bull = sc1 >= 2 and sc2 >= 1
+bear = sc1 <= -2 and sc2 <= -1
+
+atr = ta.atr(14)
+var int lastSig = na
+canSig  = na(lastSig) or bar_index - lastSig >= sigSpace
+buySig  = bull and canSig and barstate.isconfirmed and bar_index > 50
+sellSig = bear and canSig and barstate.isconfirmed and bar_index > 50
+
+plotshape(buySig,  "BUY",  shape.triangleup,   location.belowbar, cGreen, size=size.small, text="BUY",  textcolor=cGreen)
+plotshape(sellSig, "SELL", shape.triangledown, location.abovebar, cRed,   size=size.small, text="SELL", textcolor=cRed)
+
+// printed ENTRY / SL / TP for the latest signal
+var line[]  ls = array.new<line>()
+var label[] lb = array.new<label>()
+var box[]   bx = array.new<box>()
+if buySig or sellSig
+    lastSig := bar_index
+    entry = close
+    sl = buySig ? entry - atr * atrMult : entry + atr * atrMult
+    tp = buySig ? entry + (entry - sl) * rr : entry - (sl - entry) * rr
+    xe = bar_index + 18
+    array.push(bx, box.new(bar_index, math.max(entry, tp), xe, math.min(entry, tp),
+         border_color=color.new(cGreen, 80), bgcolor=color.new(cGreen, 90)))
+    array.push(bx, box.new(bar_index, math.max(entry, sl), xe, math.min(entry, sl),
+         border_color=color.new(cRed, 80), bgcolor=color.new(cRed, 92)))
+    array.push(ls, line.new(bar_index, entry, xe, entry, color=color.new(color.white, 25), style=line.style_dashed))
+    array.push(ls, line.new(bar_index, sl, xe, sl, color=color.new(cRed, 15), style=line.style_dashed))
+    array.push(ls, line.new(bar_index, tp, xe, tp, color=color.new(cGreen, 15), style=line.style_dashed))
+    array.push(lb, label.new(xe, entry, "ENTRY " + str.tostring(entry, format.mintick),
+         style=label.style_label_left, color=color.new(color.gray, 55), textcolor=color.white, size=size.small))
+    array.push(lb, label.new(xe, sl, "SL " + str.tostring(sl, format.mintick) + " (-1R)",
+         style=label.style_label_left, color=color.new(cRed, 55), textcolor=color.white, size=size.small))
+    array.push(lb, label.new(xe, tp, "TP " + str.tostring(tp, format.mintick) + " (+" + str.tostring(rr, "#.#") + "R)",
+         style=label.style_label_left, color=color.new(cGreen, 55), textcolor=color.white, size=size.small))
+    while array.size(bx) > 6
+        box.delete(array.shift(bx))
+    while array.size(ls) > 9
+        line.delete(array.shift(ls))
+    while array.size(lb) > 9
+        label.delete(array.shift(lb))
+
+alertcondition(buySig,  "NaatAI Mixed BUY",  "NaatAI Mixed: BUY (both timeframes agree) on {{ticker}} {{interval}}")
+alertcondition(sellSig, "NaatAI Mixed SELL", "NaatAI Mixed: SELL (both timeframes agree) on {{ticker}} {{interval}}")
+
+// ------------------------------ Dashboard ----------------------------
+tfName(_s) => _s >= 2 ? "STRONG UP" : _s >= 1 ? "UP" : _s <= -2 ? "STRONG DOWN" : _s <= -1 ? "DOWN" : "FLAT"
+tfCol(_s)  => _s >= 1 ? cGreen : _s <= -1 ? cRed : cAmb
+combined = buySig ? "BUY" : sellSig ? "SELL" : bull ? "BUY setup" : bear ? "SELL setup" : "WAIT"
+combCol  = (buySig or bull) ? cGreen : (sellSig or bear) ? cRed : cAmb
+
+var table t = table.new(position.top_right, 2, 5,
+     bgcolor=color.new(#131823, 8), border_color=color.new(#232b3a, 0), border_width=1)
+if showTbl and barstate.islast
+    mut = color.new(cMut, 0)
+    txt = color.new(#e6edf3, 0)
+    table.cell(t, 0, 0, "NaatAI Mixed", text_color=cBlue, text_size=size.small)
+    table.cell(t, 1, 0, "2-TF confluence", text_color=cBlue, text_size=size.small)
+    table.cell(t, 0, 1, "Chart 1 (" + timeframe.period + ")", text_color=mut, text_size=size.small)
+    table.cell(t, 1, 1, tfName(sc1), text_color=tfCol(sc1), text_size=size.small)
+    table.cell(t, 0, 2, "Chart 2 (" + tf2 + ")", text_color=mut, text_size=size.small)
+    table.cell(t, 1, 2, tfName(sc2), text_color=tfCol(sc2), text_size=size.small)
+    table.cell(t, 0, 3, "RSI 1 / 2", text_color=mut, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(rsi1, "#") + " / " + str.tostring(rsi2, "#"), text_color=txt, text_size=size.small)
+    table.cell(t, 0, 4, "Mixed signal", text_color=mut, text_size=size.small)
+    table.cell(t, 1, 4, combined, text_color=combCol, text_size=size.normal)
