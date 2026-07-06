@@ -83,7 +83,8 @@
 "use strict";
 const SRC=["https://fapi.binance.com/fapi/v1","https://data-api.binance.vision/api/v3"];
 let KA="";
-const S={sym:"BTCUSDT",srcTf:"1m",bars:[],bricks:[],T:0,R:0,O:0,bands:true,pxDec:2};
+const S={sym:"BTCUSDT",srcTf:"1m",bars:[],bricks:[],T:0,R:0,O:0,bands:true,pxDec:2,
+  lvl:0,dir:0,ws:null,drawAt:0,live:false};
 const $=id=>document.getElementById(id);
 const COL={up:"#2ecc71",dn:"#ff5c5c",wick:"#8b98a9",grid:"#1c2333",ax:"#8b98a9",
   band:"#4d9fff",bandFill:"rgba(77,159,255,0.06)",ema:"#c98500",mag:"#d55181"};
@@ -100,35 +101,62 @@ function fmt(x){return x==null||isNaN(x)?"—":Number(x).toLocaleString("en-US",
 // -------- UniRenko brick engine --------
 // Feed a price path; emit bricks. Continuation when price moves T past the level,
 // reversal when it moves R against. Offset shifts each new brick's open.
-function buildBricks(){
-  const T=S.T, R=S.R, O=S.O;
-  if(!(T>0)||!(R>0)||!S.bars.length){S.bricks=[];return;}
-  const out=[];
-  let dir=0, lvl=S.bars[0].o;   // current close level
-  const emit=(from,to,d)=>{
-    const op = d>0 ? from - O : from + O;      // offset the open -> overlap/wick look
-    out.push({o:op, c:to, h:Math.max(op,to), l:Math.min(op,to), dir:d});
-  };
-  for(const b of S.bars){
-    // approximate intrabar path: open -> (low,high) for up candle, (high,low) for down -> close
-    const up = b.c>=b.o;
-    const path = up ? [b.o,b.l,b.h,b.c] : [b.o,b.h,b.l,b.c];
-    for(const p of path){
-      let guard=0;
-      while(guard++<5000){
-        if(dir>=0){
-          if(p >= lvl+T){ emit(lvl,lvl+T,1); lvl+=T; dir=1; continue; }
-          if(p <= lvl-R){ emit(lvl,lvl-R,-1); lvl-=R; dir=-1; continue; }
-        }else{
-          if(p <= lvl-T){ emit(lvl,lvl-T,-1); lvl-=T; dir=-1; continue; }
-          if(p >= lvl+R){ emit(lvl,lvl+R,1); lvl+=R; dir=1; continue; }
-        }
-        break;
-      }
+function emitBrick(from,to,d){
+  const op = d>0 ? from - S.O : from + S.O;   // offset the open -> overlap/wick look
+  S.bricks.push({o:op, c:to, h:Math.max(op,to), l:Math.min(op,to), dir:d});
+}
+// feed one price into the running engine; returns true if any brick formed
+function feed(p){
+  const T=S.T, R=S.R; if(!(T>0)||!(R>0))return false;
+  let dir=S.dir, lvl=S.lvl, changed=false, guard=0;
+  while(guard++<5000){
+    if(dir>=0){
+      if(p >= lvl+T){ emitBrick(lvl,lvl+T,1); lvl+=T; dir=1; changed=true; continue; }
+      if(p <= lvl-R){ emitBrick(lvl,lvl-R,-1); lvl-=R; dir=-1; changed=true; continue; }
+    }else{
+      if(p <= lvl-T){ emitBrick(lvl,lvl-T,-1); lvl-=T; dir=-1; changed=true; continue; }
+      if(p >= lvl+R){ emitBrick(lvl,lvl+R,1); lvl+=R; dir=1; changed=true; continue; }
     }
+    break;
   }
-  S.bricks=out;
-  $("brickInfo").textContent=`${out.length} bricks · T ${fmt(T)} R ${fmt(R)} O ${fmt(O)}`;
+  S.dir=dir; S.lvl=lvl; return changed;
+}
+function buildBricks(){
+  S.bricks=[];
+  if(!(S.T>0)||!(S.R>0)||!S.bars.length){ return; }
+  S.dir=0; S.lvl=S.bars[0].o;
+  for(const b of S.bars){
+    const up=b.c>=b.o, path=up?[b.o,b.l,b.h,b.c]:[b.o,b.h,b.l,b.c];
+    for(const p of path) feed(p);   // build history through the same engine
+  }
+  $("brickInfo").textContent=`${S.bricks.length} bricks · T ${fmt(S.T)} R ${fmt(S.R)} O ${fmt(S.O)}`;
+}
+
+// -------- live WebSocket stream: real-time brick formation --------
+function stopStream(){ if(S.ws){try{S.ws.close();}catch(e){} S.ws=null;} S.live=false; }
+function startStream(futures){
+  stopStream();
+  const host=futures?"wss://fstream.binance.com/ws/":"wss://stream.binance.com:9443/ws/";
+  try{
+    const ws=new WebSocket(host + S.sym.toLowerCase() + "@aggTrade");
+    S.ws=ws;
+    ws.onopen=()=>{ S.live=true; setStatus(); };
+    ws.onmessage=ev=>{
+      const m=JSON.parse(ev.data); const p=+ (m.p!==undefined ? m.p : (m.data&&m.data.p));
+      if(!p) return;
+      const changed=feed(p);
+      const now=Date.now();
+      if(changed || now-S.drawAt>250){ S.drawAt=now; draw(); }   // throttle redraw ~4/sec
+    };
+    ws.onclose=()=>{ if(S.ws===ws){ S.ws=null; S.live=false; setStatus();
+      setTimeout(()=>{ if(!S.ws && S.bars.length) startStream(futures); },3000); } };
+    ws.onerror=()=>{ try{ws.close();}catch(e){} };
+  }catch(e){ S.live=false; }
+}
+function setStatus(){
+  const src=KA.includes("fapi")?"Binance Futures":"Binance mirror (spot)";
+  $("status").innerHTML=`<span style="color:${S.live?"var(--green)":"var(--amber)"}">●</span> `+
+    `${src} · ${S.sym} · ${S.srcTf} source · ${S.live?"LIVE stream":"polling"}`;
 }
 
 function autoParams(){
@@ -201,8 +229,9 @@ async function load(){
     S.pxDec=priceDec(S.bars[S.bars.length-1].c);
     if(!(S.T>0)) autoParams();
     buildBricks();resize();draw();
-    $("status").innerHTML=`<span style="color:var(--green)">●</span> ${lbl} · ${S.sym} · ${S.srcTf} source`;
-  }catch(e){banner("⚠ "+e.message+" — open from a network where Binance works.");$("status").textContent="";}
+    setStatus();
+    startStream(KA.includes("fapi"));   // go LIVE: real-time bricks off the aggTrade stream
+  }catch(e){stopStream();banner("⚠ "+e.message+" — open from a network where Binance works.");$("status").textContent="";}
 }
 
 async function symbols(){try{const b=KA.replace("/klines","");const info=await getJSON(b+"/exchangeInfo",9000);
@@ -221,7 +250,9 @@ function controls(){
 }
 
 setup();controls();load().then(symbols);
-setInterval(()=>{if(S.bars.length)load();},30000);
+// Slow resync backup: if the live stream is up, the bricks are already current,
+// so only re-pull klines when we are NOT streaming (e.g. WS blocked on this network).
+setInterval(()=>{if(S.bars.length && !S.live)load();},60000);
 </script>
 </body>
 </html>
