@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>naatai · UniRenko</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#131823;--panel2:#1a2030;--line:#232b3a;--text:#e6edf3;
+    --muted:#8b98a9;--green:#2ecc71;--red:#ff5c5c;--amber:#f5a623;--blue:#4d9fff;--accent:#6c5ce7;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+  .wrap{max-width:1500px;margin:0 auto;padding:12px 12px 40px;}
+  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .brand{font-size:19px;font-weight:800;}.brand span{color:var(--accent);}
+  .sub{color:var(--muted);font-size:12px;}
+  a{color:var(--blue);text-decoration:none;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:9px 0;}
+  input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:7px;padding:6px 9px;font-size:13px;outline:none;}
+  #sym{width:110px;text-transform:uppercase;font-weight:700;}
+  .num{width:76px;font-variant-numeric:tabular-nums;}
+  label{color:var(--muted);font-size:11.5px;margin-right:2px;}
+  .btn{padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--text);font-size:12.5px;cursor:pointer;}
+  .btn:hover{border-color:var(--accent);}
+  .btn.active{border-color:var(--accent);background:rgba(108,92,231,.25);color:#fff;}
+  .banner{margin:8px 0;padding:8px 12px;border-radius:9px;font-size:12px;display:none;
+    background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.4);color:var(--amber);}
+  .chartcol{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:6px;position:relative;}
+  .pane canvas{display:block;width:100%;cursor:crosshair;}
+  .plabel{position:absolute;top:5px;left:10px;font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.6px;pointer-events:none;z-index:2;}
+  .legend{position:absolute;top:5px;right:66px;text-align:right;font-size:11px;color:var(--muted);z-index:2;pointer-events:none;}
+  .legend i{font-style:normal;margin-left:9px;}
+  footer{margin-top:16px;color:var(--muted);font-size:11px;text-align:center;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">naat<span>ai</span> · UniRenko</div>
+      <div class="sub">Real UniRenko bricks built from Binance price · Trend / Reversal / Offset (like NinjaTrader T/R/O)</div>
+    </div>
+    <div><a href="chart.html">order-flow chart →</a></div>
+  </header>
+
+  <div class="row">
+    <input id="sym" list="symList" value="BTCUSDT" spellcheck="false" />
+    <datalist id="symList"></datalist>
+    <select id="srcTf">
+      <option value="1m" selected>1m source</option>
+      <option value="3m">3m source</option>
+      <option value="5m">5m source</option>
+      <option value="15m">15m source</option>
+    </select>
+    <button class="btn" id="go">Load</button>
+    <span class="sub" id="status"></span>
+  </div>
+  <div class="row">
+    <label>Trend</label><input id="pT" class="num" type="number" step="any" />
+    <label>Reversal</label><input id="pR" class="num" type="number" step="any" />
+    <label>Offset</label><input id="pO" class="num" type="number" step="any" />
+    <button class="btn" id="auto">Auto</button>
+    <button class="btn active" id="tBands">Trend bands</button>
+    <span class="sub" id="brickInfo"></span>
+  </div>
+  <div class="banner" id="banner"></div>
+
+  <div class="chartcol" id="col">
+    <div class="pane" id="pMain"><div class="plabel">UniRenko</div><div class="legend" id="leg"></div><canvas></canvas></div>
+  </div>
+
+  <footer>
+    A UniRenko brick prints when price moves <b>Trend</b> in the current direction, or <b>Reversal</b> against it; <b>Offset</b>
+    shifts each brick's open (the overlap look). Built from Binance klines path (O→L/H→C). This is the UniRenko algorithm, tune
+    T/R/O to taste — it is not NinjaTrader's exact engine. Educational tool, NOT financial advice.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const SRC=["https://fapi.binance.com/fapi/v1","https://data-api.binance.vision/api/v3"];
+let KA="";
+const S={sym:"BTCUSDT",srcTf:"1m",bars:[],bricks:[],T:0,R:0,O:0,bands:true,pxDec:2};
+const $=id=>document.getElementById(id);
+const COL={up:"#2ecc71",dn:"#ff5c5c",wick:"#8b98a9",grid:"#1c2333",ax:"#8b98a9",
+  band:"#4d9fff",bandFill:"rgba(77,159,255,0.06)",ema:"#c98500",mag:"#d55181"};
+
+function banner(m){const e=$("banner");e.style.display=m?"block":"none";e.textContent=m;}
+async function getJSON(u,ms){const ac=new AbortController();const t=setTimeout(()=>ac.abort(),ms||12000);
+  try{const r=await fetch(u,{signal:ac.signal});if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();if(j&&j.code!==undefined&&j.msg)throw new Error(j.msg);return j;}finally{clearTimeout(t);}}
+async function detect(){for(const b of SRC){try{await getJSON(b+"/klines?symbol=BTCUSDT&interval=1m&limit=1",8000);
+  KA=b+"/klines";return b.includes("fapi")?"Binance Futures":"Binance mirror (spot)";}catch(e){}}throw new Error("no reachable Binance endpoint");}
+function priceDec(p){return p>=1000?1:p>=100?2:p>=1?4:6;}
+function fmt(x){return x==null||isNaN(x)?"—":Number(x).toLocaleString("en-US",{minimumFractionDigits:S.pxDec,maximumFractionDigits:S.pxDec});}
+
+// -------- UniRenko brick engine --------
+// Feed a price path; emit bricks. Continuation when price moves T past the level,
+// reversal when it moves R against. Offset shifts each new brick's open.
+function buildBricks(){
+  const T=S.T, R=S.R, O=S.O;
+  if(!(T>0)||!(R>0)||!S.bars.length){S.bricks=[];return;}
+  const out=[];
+  let dir=0, lvl=S.bars[0].o;   // current close level
+  const emit=(from,to,d)=>{
+    const op = d>0 ? from - O : from + O;      // offset the open -> overlap/wick look
+    out.push({o:op, c:to, h:Math.max(op,to), l:Math.min(op,to), dir:d});
+  };
+  for(const b of S.bars){
+    // approximate intrabar path: open -> (low,high) for up candle, (high,low) for down -> close
+    const up = b.c>=b.o;
+    const path = up ? [b.o,b.l,b.h,b.c] : [b.o,b.h,b.l,b.c];
+    for(const p of path){
+      let guard=0;
+      while(guard++<5000){
+        if(dir>=0){
+          if(p >= lvl+T){ emit(lvl,lvl+T,1); lvl+=T; dir=1; continue; }
+          if(p <= lvl-R){ emit(lvl,lvl-R,-1); lvl-=R; dir=-1; continue; }
+        }else{
+          if(p <= lvl-T){ emit(lvl,lvl-T,-1); lvl-=T; dir=-1; continue; }
+          if(p >= lvl+R){ emit(lvl,lvl+R,1); lvl+=R; dir=1; continue; }
+        }
+        break;
+      }
+    }
+  }
+  S.bricks=out;
+  $("brickInfo").textContent=`${out.length} bricks · T ${fmt(T)} R ${fmt(R)} O ${fmt(O)}`;
+}
+
+function autoParams(){
+  if(!S.bars.length)return;
+  const rng=S.bars.map(b=>b.h-b.l).filter(x=>x>0).sort((a,b)=>a-b);
+  const med=rng[Math.floor(rng.length/2)]||(S.bars[0].c*0.0005);
+  const t=+(med*1.0).toPrecision(3);
+  S.T=t; S.R=t; S.O=+(t*0.66).toPrecision(3);
+  $("pT").value=S.T; $("pR").value=S.R; $("pO").value=S.O;
+}
+
+// -------- indicators on brick closes (the ribbon) --------
+function ema(v,p){const o=[];let e=null,k=2/(p+1);for(let i=0;i<v.length;i++){e=e===null?v[i]:v[i]*k+e*(1-k);o.push(i>=p-1?e:null);}return o;}
+function bb(v,p,m){const o=[];for(let i=0;i<v.length;i++){if(i<p-1){o.push(null);continue;}let s=0;for(let j=i-p+1;j<=i;j++)s+=v[j];
+  const mn=s/p;let sd=0;for(let j=i-p+1;j<=i;j++)sd+=(v[j]-mn)**2;sd=Math.sqrt(sd/p);o.push({up:mn+m*sd,dn:mn-m*sd,mid:mn});}return o;}
+
+// -------- render --------
+const panes={};
+function setup(){const el=$("pMain");panes.m={el,cv:el.querySelector("canvas"),ctx:el.querySelector("canvas").getContext("2d")};
+  window.addEventListener("resize",()=>{resize();draw();});}
+function resize(){const w=$("col").clientWidth-12,dpr=window.devicePixelRatio||1,h=Math.max(420,window.innerHeight*0.72);
+  const p=panes.m;p.w=w;p.h=h;p.cv.width=w*dpr;p.cv.height=h*dpr;p.cv.style.height=h+"px";p.ctx.setTransform(dpr,0,0,dpr,0,0);}
+const AXW=64;
+function draw(){
+  const p=panes.m,ctx=p.ctx,w=p.w,h=p.h;ctx.clearRect(0,0,w,h);
+  const br=S.bricks;if(!br.length){ctx.fillStyle=COL.ax;ctx.font="12px sans-serif";ctx.fillText("No bricks — load a symbol and set Trend/Reversal.",12,h/2);return;}
+  const maxN=Math.max(20,Math.floor((w-AXW)/6));
+  const arr=br.slice(-maxN);
+  let lo=Infinity,hi=-Infinity;for(const b of arr){if(b.l<lo)lo=b.l;if(b.h>hi)hi=b.h;}
+  const closes=arr.map(b=>b.c),e20=ema(closes,20),bands=S.bands?bb(closes,20,2):null;
+  if(bands)for(const bd of bands)if(bd){if(bd.up>hi)hi=bd.up;if(bd.dn<lo)lo=bd.dn;}
+  const pad=(hi-lo)*0.06||1;lo-=pad;hi+=pad;
+  const y=v=>h-8-(v-lo)/(hi-lo)*(h-16);
+  const bw=(w-AXW)/arr.length, x=i=>i*bw+bw/2;
+  // grid + axis
+  ctx.strokeStyle=COL.grid;ctx.beginPath();for(let g=0;g<=6;g++){const yy=8+g*(h-16)/6;ctx.moveTo(0,yy);ctx.lineTo(w-AXW,yy);}ctx.stroke();
+  ctx.fillStyle=COL.ax;ctx.font="10px sans-serif";
+  for(let g=0;g<=6;g++){const vv=hi-(hi-lo)*g/6;ctx.fillText(fmt(vv),w-AXW+4,8+g*(h-16)/6+3);}
+  // trend bands ribbon
+  if(bands){
+    ctx.beginPath();let st=false;
+    for(let i=0;i<arr.length;i++){const bd=bands[i];if(!bd)continue;const xx=x(i);st?ctx.lineTo(xx,y(bd.up)):(ctx.moveTo(xx,y(bd.up)),st=true);}
+    for(let i=arr.length-1;i>=0;i--){const bd=bands[i];if(!bd)continue;ctx.lineTo(x(i),y(bd.dn));}
+    ctx.closePath();ctx.fillStyle=COL.bandFill;ctx.fill();
+    const ln=(sel,col)=>{ctx.strokeStyle=col;ctx.lineWidth=1.4;ctx.beginPath();let s2=false;
+      for(let i=0;i<arr.length;i++){const v=sel(i);if(v==null)continue;const xx=x(i),yy=y(v);s2?ctx.lineTo(xx,yy):(ctx.moveTo(xx,yy),s2=true);}ctx.stroke();ctx.lineWidth=1;};
+    ln(i=>bands[i]?bands[i].up:null,COL.band);ln(i=>bands[i]?bands[i].dn:null,COL.mag);ln(i=>e20[i],COL.ema);
+  }
+  // UniRenko bricks
+  const bodyW=Math.max(2,bw*0.7);
+  for(let i=0;i<arr.length;i++){const b=arr[i],col=b.dir>0?COL.up:COL.dn,xx=x(i);
+    // thin wick from offset overlap
+    ctx.strokeStyle=COL.wick;ctx.globalAlpha=.5;ctx.beginPath();ctx.moveTo(xx,y(b.h));ctx.lineTo(xx,y(b.l));ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=col;const y1=y(b.o),y2=y(b.c);ctx.fillRect(xx-bodyW/2,Math.min(y1,y2),bodyW,Math.max(1.5,Math.abs(y2-y1)));}
+  // last price line
+  const last=arr[arr.length-1];ctx.strokeStyle=last.dir>0?COL.up:COL.dn;ctx.setLineDash([2,3]);
+  ctx.beginPath();ctx.moveTo(0,y(last.c));ctx.lineTo(w-AXW,y(last.c));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=last.dir>0?"#1d6b3f":"#7e2f2f";ctx.fillRect(w-AXW+1,y(last.c)-8,AXW-2,16);
+  ctx.fillStyle="#fff";ctx.fillText(fmt(last.c),w-AXW+5,y(last.c)+3.5);
+  $("leg").innerHTML=S.bands?`<i style="color:${COL.band}">BB up</i><i style="color:${COL.ema}">EMA20</i><i style="color:${COL.mag}">BB dn</i>`:"";
+}
+
+async function load(){
+  banner("");$("status").textContent="loading…";
+  try{
+    const lbl=await detect();
+    const kl=await getJSON(`${KA}?symbol=${S.sym}&interval=${S.srcTf}&limit=1000`);
+    S.bars=kl.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
+    if(!S.bars.length)throw new Error("no data");
+    S.pxDec=priceDec(S.bars[S.bars.length-1].c);
+    if(!(S.T>0)) autoParams();
+    buildBricks();resize();draw();
+    $("status").innerHTML=`<span style="color:var(--green)">●</span> ${lbl} · ${S.sym} · ${S.srcTf} source`;
+  }catch(e){banner("⚠ "+e.message+" — open from a network where Binance works.");$("status").textContent="";}
+}
+
+async function symbols(){try{const b=KA.replace("/klines","");const info=await getJSON(b+"/exchangeInfo",9000);
+  const s=(info.symbols||[]).filter(x=>x.quoteAsset==="USDT"&&x.status==="TRADING").map(x=>x.symbol).sort();
+  $("symList").innerHTML=s.slice(0,400).map(x=>`<option value="${x}">`).join("");}catch(e){}}
+
+function controls(){
+  const go=()=>{const v=$("sym").value.trim().toUpperCase();if(v){S.sym=v;S.T=0;load();}};
+  $("go").addEventListener("click",go);
+  $("sym").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
+  $("srcTf").addEventListener("change",()=>{S.srcTf=$("srcTf").value;S.T=0;load();});
+  $("auto").addEventListener("click",()=>{autoParams();buildBricks();draw();});
+  const apply=()=>{S.T=+$("pT").value||0;S.R=+$("pR").value||0;S.O=+$("pO").value||0;buildBricks();draw();};
+  ["pT","pR","pO"].forEach(id=>$(id).addEventListener("input",apply));
+  $("tBands").addEventListener("click",()=>{S.bands=!S.bands;$("tBands").classList.toggle("active",S.bands);draw();});
+}
+
+setup();controls();load().then(symbols);
+setInterval(()=>{if(S.bars.length)load();},30000);
+</script>
+</body>
+</html>
