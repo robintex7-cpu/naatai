@@ -23,6 +23,10 @@ htmlcov/
 .env
 *.key
 
+# Node (test tooling — playwright-core installed on demand)
+node_modules/
+package-lock.json
+
 # OS / editor
 .DS_Store
 .idea/
